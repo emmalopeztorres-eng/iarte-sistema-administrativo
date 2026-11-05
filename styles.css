@@ -95,3 +95,18 @@
 .scholarship-renewal span{font-size:10px;color:var(--muted)}
 .scholarship-renewal .text-link{justify-self:start;padding:3px 0}
 @media(max-width:700px){.scholarship-modal{padding:16px}.scholarship-modal .form-row,.scholarship-checklist,.scholarship-lower{grid-template-columns:1fr}}
+
+
+/* Módulo de inscripciones */
+.enrollment-modal{width:min(850px,100%);max-height:90vh;overflow:auto}
+.enrollment-modal .form-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+.enrollment-modal textarea{resize:vertical;font-family:"DM Sans",sans-serif}
+.enrollment-checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 14px;padding:13px;border:1px solid var(--line);border-radius:9px;margin:12px 0 17px}
+.enrollment-checklist label{display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#555b6c}
+.enrollment-checklist input{accent-color:var(--purple);margin:1px 0 0}
+.enrollment-help{margin-top:17px}
+.enrollment-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.enrollment-steps>div{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:9px;min-height:56px}
+.enrollment-steps b{display:grid;place-items:center;flex:0 0 25px;height:25px;border-radius:50%;background:#f0edfa;color:var(--purple);font-size:11px}
+.enrollment-steps span{font-size:10px;color:var(--ink);line-height:1.35}
+@media(max-width:700px){.enrollment-modal{padding:16px}.enrollment-modal .form-row,.enrollment-checklist{grid-template-columns:1fr}.enrollment-steps{grid-template-columns:1fr 1fr}}
