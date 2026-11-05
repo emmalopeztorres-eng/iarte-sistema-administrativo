@@ -13,7 +13,7 @@ const initialData = {
 };
 let data = loadData();
 const root = document.getElementById("viewRoot");
-const sectionNames = {inicio:"Inicio",alumnos:"Alumnos",docentes:"Docentes",academico:"Organización académica",asistencia:"Asistencia",horarios:"Horarios y aulas",produccion:"Producción artística",finanzas:"Administración",becas:"Becas",informes:"Informes"};
+const sectionNames = {inicio:"Inicio",alumnos:"Alumnos",docentes:"Docentes",academico:"Organización académica",asistencia:"Asistencia",horarios:"Horarios y aulas",produccion:"Producción artística",finanzas:"Administración",becas:"Becas",inscripciones:"Inscripciones",informes:"Informes"};
 let activeView = "inicio";
 function loadData(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)) || structuredClone(initialData)}catch{return structuredClone(initialData)}}
 function saveData(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}
@@ -251,6 +251,7 @@ function renderGeneric(type){
  if(type==="produccion")return renderProductionModule();
  if(type==="finanzas")return renderFinanceModule();
  if(type==="becas")return renderScholarshipModule();
+ if(type==="inscripciones")return renderEnrollmentModule();
  if(type==="asistencia")return renderAttendanceModule();
  if(type==="horarios")return renderScheduleModule();
  if(type!=="academico")return renderOriginalGeneric(type);
@@ -568,4 +569,89 @@ document.addEventListener("click",e=>{
  const add=e.target.closest("[data-scholarship-add]");if(add){openScholarshipForm();return}
  const edit=e.target.closest("[data-scholarship-edit]");if(edit){openScholarshipForm(edit.dataset.scholarshipEdit);return}
  const del=e.target.closest("[data-scholarship-delete]");if(del&&confirm("¿Eliminar esta solicitud de beca?")){data.becas=data.becas.filter(x=>x.id!==del.dataset.scholarshipDelete);saveData();render();toast("Solicitud eliminada")}
+});
+
+
+// ===== MÓDULO DE INSCRIPCIONES =====
+if(!Array.isArray(data.inscripciones))data.inscripciones=[];
+const enrollmentStates=["Preinscripción","Documentación pendiente","Entrevista pendiente","En evaluación","Lista de espera","Admitido","Confirmado","Rechazado","Desistió","Anulado"];
+function enrollmentStudentLabel(x){return [x.nombre,x.apellido].filter(Boolean).join(" ")||"Sin nombre"}
+function enrollmentStats(){
+ const all=data.inscripciones;
+ return {total:all.length,open:all.filter(x=>!["Confirmado","Rechazado","Desistió","Anulado"].includes(x.estado)).length,waiting:all.filter(x=>x.estado==="Lista de espera").length,confirmed:all.filter(x=>x.estado==="Confirmado").length};
+}
+function enrollmentRows(rows){
+ if(!rows.length)return '<tr><td colspan="8" class="empty-note">No hay inscripciones que coincidan. Creá una nueva preinscripción para comenzar.</td></tr>';
+ return rows.map(x=>'<tr><td><strong>'+escapeHTML(enrollmentStudentLabel(x))+'</strong><br><small>'+escapeHTML(x.codigo||"")+'</small></td><td>'+escapeHTML(x.disciplina||"—")+'</td><td>'+escapeHTML(x.nivel||"—")+'</td><td>'+escapeHTML(x.comisionNombre||"Sin asignar")+'</td><td>'+escapeHTML(x.fechaSolicitud||"—")+'</td><td><span class="status '+(["Rechazado","Desistió","Anulado"].includes(x.estado)?"pending":"")+'">'+escapeHTML(x.estado)+'</span></td><td>'+escapeHTML(x.alumnoId||"Pendiente")+'</td><td><button class="text-link" data-enrollment-edit="'+escapeHTML(x.id)+'">Abrir</button> · <button class="text-link" data-enrollment-delete="'+escapeHTML(x.id)+'">Eliminar</button></td></tr>').join("");
+}
+function renderEnrollmentModule(){
+ const st=enrollmentStats(),rows=[...data.inscripciones].sort((a,b)=>(b.fechaSolicitud||"").localeCompare(a.fechaSolicitud||""));
+ root.innerHTML=heading("INGRESO INSTITUCIONAL","Inscripciones y admisiones","Gestioná preinscripciones, vacantes, entrevistas, documentación, admisiones y matrícula.",'<button class="primary-btn" data-enrollment-add="1">＋ Nueva preinscripción</button>')+
+ '<div class="stats-grid">'+stat("Solicitudes",st.total,"Preinscripciones registradas","＋","lav")+stat("En proceso",st.open,"Pendientes de resolución","◷","peach")+stat("Lista de espera",st.waiting,"Solicitudes sin vacante","▤","sky")+stat("Matrículas confirmadas",st.confirmed,"Ingresos formalizados","✓","mint")+'</div>'+
+ '<div class="notice"><strong>Proceso de admisión:</strong> una preinscripción no crea automáticamente un legajo. Al pasar a “Confirmado”, el sistema genera el legajo si todavía no existe o actualiza la ficha del alumno vinculado. Revisá los datos antes de confirmar.</div>'+
+ '<div class="toolbar"><input class="search-input" id="enrollmentSearch" placeholder="Buscar por nombre, código, disciplina o comisión..."><select class="field-select" id="enrollmentStatus"><option value="">Todos los estados</option>'+enrollmentStates.map(x=>'<option>'+x+'</option>').join("")+'</select><button class="secondary-btn" id="enrollmentExport">Exportar CSV</button></div>'+
+ '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Postulante</th><th>Disciplina</th><th>Nivel</th><th>Comisión</th><th>Solicitud</th><th>Estado</th><th>Legajo</th><th>Acciones</th></tr></thead><tbody id="enrollmentRows">'+enrollmentRows(rows)+'</tbody></table></div>'+
+ '<div class="panel enrollment-help"><div class="panel-head"><div><h2>Etapas de ingreso</h2><div class="panel-sub">Circuito sugerido para el equipo administrativo</div></div></div><div class="enrollment-steps">'+["Preinscripción","Revisión documental","Entrevista / evaluación","Asignación de vacante","Confirmación y legajo"].map((x,i)=>'<div><b>'+(i+1)+'</b><span>'+x+'</span></div>').join("")+'</div></div>';
+ const apply=()=>{const q=document.getElementById("enrollmentSearch").value.toLowerCase(),s=document.getElementById("enrollmentStatus").value;document.getElementById("enrollmentRows").innerHTML=enrollmentRows(rows.filter(x=>(!s||x.estado===s)&&[enrollmentStudentLabel(x),x.codigo,x.disciplina,x.nivel,x.comisionNombre,x.estado,x.email].join(" ").toLowerCase().includes(q)))};
+ document.getElementById("enrollmentSearch").oninput=apply;document.getElementById("enrollmentStatus").onchange=apply;document.getElementById("enrollmentExport").onclick=exportEnrollmentsCSV;
+}
+function enrollmentOptionList(items,selected,label){
+ return '<option value="">'+label+'</option>'+items.map(x=>'<option value="'+escapeHTML(x.id)+'" '+(selected===x.id?"selected":"")+'>'+escapeHTML(x.nombre||"Sin nombre")+'</option>').join("");
+}
+function openEnrollmentForm(id=null){
+ const old=id?data.inscripciones.find(x=>x.id===id):null;
+ const b=document.createElement("div");b.className="modal-backdrop";
+ const field=(key,label,value="",type="text",required=false)=>'<div class="form-field"><label>'+label+'</label><input class="field-input" name="'+key+'" type="'+type+'" value="'+escapeHTML(value??"")+'" '+(required?"required":"")+'></div>';
+ const disciplines=data.academia.disciplinas||[],levels=data.academia.niveles||[],commissions=data.academia.comisiones||[];
+ const studentList=data.alumnos.map(x=>'<option value="'+escapeHTML(x.id)+'" '+(old?.alumnoId===x.id?"selected":"")+'>'+escapeHTML(studentFullName(x))+' · '+escapeHTML(x.id)+'</option>').join("");
+ const docs=["Formulario de inscripción completo","Documento de identidad verificado","Datos de contacto y responsable","Autorización / documentación correspondiente","Entrevista realizada","Evaluación o audición completada"];
+ b.innerHTML='<form class="modal enrollment-modal" id="enrollmentForm"><h2>'+(old?"Editar inscripción":"Nueva preinscripción")+'</h2><p>Registrá al postulante, su propuesta académica y el recorrido de admisión.</p>'+
+ '<div class="form-section-title">Datos del postulante</div><div class="form-row">'+field("nombre","Nombre *",old?.nombre,"text",true)+field("apellido","Apellido *",old?.apellido,"text",true)+field("fechaNacimiento","Fecha de nacimiento",old?.fechaNacimiento,"date")+field("documento","Documento (demostración)",old?.documento)+field("email","Correo electrónico",old?.email,"email")+field("telefono","Teléfono",old?.telefono,"tel")+field("responsable","Adulto responsable / contacto",old?.responsable)+field("telefonoResponsable","Teléfono del responsable",old?.telefonoResponsable,"tel")+'</div>'+
+ '<div class="form-section-title">Propuesta académica</div><div class="form-row">'+
+ '<div class="form-field"><label>Disciplina</label><select class="field-input" name="disciplinaId" id="enrollmentDiscipline">'+enrollmentOptionList(disciplines,old?.disciplinaId,"Elegir disciplina")+'</select></div>'+
+ '<div class="form-field"><label>Nivel</label><select class="field-input" name="nivelId" id="enrollmentLevel">'+enrollmentOptionList(levels,old?.nivelId,"Elegir nivel")+'</select></div>'+
+ '<div class="form-field"><label>Comisión solicitada</label><select class="field-input" name="comisionId" id="enrollmentCommission">'+enrollmentOptionList(commissions,old?.comisionId,"Sin preferencia / por asignar")+'</select></div>'+
+ field("turnoPreferido","Turno preferido",old?.turnoPreferido)+field("materiasSolicitadas","Materias / actividades de interés",old?.materiasSolicitadas)+field("fechaSolicitud","Fecha de preinscripción",old?.fechaSolicitud||new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),"date",true)+field("periodo","Período de ingreso",old?.periodo||new Date().getFullYear())+'</div>'+
+ '<div class="form-section-title">Documentación y admisión</div><div class="enrollment-checklist">'+docs.map((x,i)=>'<label><input type="checkbox" name="doc_'+i+'" '+(old?.documentacion?.[i]?"checked":"")+'><span>'+x+'</span></label>').join("")+'</div>'+
+ '<div class="form-row">'+field("fechaEntrevista","Fecha de entrevista / audición",old?.fechaEntrevista,"date")+field("responsableAdmision","Responsable de admisión",old?.responsableAdmision)+field("vacante","Vacantes disponibles (referencia)",old?.vacante??"","number")+
+ '<div class="form-field"><label>Estado de la solicitud</label><select class="field-input" name="estado">'+enrollmentStates.map(x=>'<option '+((old?.estado||"Preinscripción")===x?"selected":"")+'>'+x+'</option>').join("")+'</select></div></div>'+
+ '<div class="form-field"><label>Observaciones administrativas / académicas</label><textarea class="field-input" name="observaciones" rows="3">'+escapeHTML(old?.observaciones||"")+'</textarea></div>'+
+ '<div class="form-field"><label>Alumno/a ya registrado/a (reinscripción opcional)</label><select class="field-input" name="alumnoId"><option value="">Nuevo ingreso</option>'+studentList+'</select></div>'+
+ '<div class="modal-actions"><button type="button" class="secondary-btn" id="cancelEnrollment">Cancelar</button><button class="primary-btn">Guardar inscripción</button></div></form>';
+ document.body.appendChild(b);b.querySelector("#cancelEnrollment").onclick=()=>b.remove();b.addEventListener("click",e=>{if(e.target===b)b.remove()});
+ b.querySelector("#enrollmentForm").onsubmit=e=>{
+  e.preventDefault();const fd=new FormData(e.target),f=Object.fromEntries(fd.entries()),docs=[0,1,2,3,4,5].map(i=>fd.has("doc_"+i));
+  const disc=disciplines.find(x=>x.id===f.disciplinaId),level=levels.find(x=>x.id===f.nivelId),com=commissions.find(x=>x.id===f.comisionId);
+  const rec={...f,id:old?.id||"INS-"+String(Date.now()).slice(-8),codigo:old?.codigo||"PRE-"+String(Date.now()).slice(-7),documentacion:docs,disciplina:disc?.nombre||"",nivel:level?.nombre||"",comisionNombre:com?.nombre||"",vacante:Number(f.vacante||0)};
+  if(old){Object.assign(old,rec)}else data.inscripciones.push(rec);
+  if(rec.estado==="Confirmado")confirmEnrollmentRecord(rec);
+  data.actividades.unshift({icon:"＋",title:old?"Inscripción actualizada":"Nueva preinscripción",detail:enrollmentStudentLabel(rec),time:"Ahora"});
+  saveData();b.remove();render();toast(rec.estado==="Confirmado"?"Inscripción confirmada y legajo actualizado":"Inscripción guardada");
+ };
+}
+function confirmEnrollmentRecord(rec){
+ let student=rec.alumnoId?data.alumnos.find(x=>x.id===rec.alumnoId):null;
+ if(!student){
+  const id="IA-"+String(Date.now()).slice(-7);
+  student={id,nombre:rec.nombre,apellido:rec.apellido,fechaNacimiento:rec.fechaNacimiento||"",documento:rec.documento||"",email:rec.email||"",telefono:rec.telefono||"",responsable:rec.responsable||"",telefonoResponsable:rec.telefonoResponsable||"",disciplina:rec.disciplina||"",nivel:rec.nivel||"",comision:rec.comisionNombre||"",turno:rec.turnoPreferido||"",fechaIngreso:rec.fechaSolicitud||"",estado:"Activo",observaciones:"Ingreso generado desde inscripción "+rec.codigo};
+  data.alumnos.push(student);rec.alumnoId=student.id;
+ }else{
+  student.estado="Activo";
+  if(rec.disciplina)student.disciplina=rec.disciplina;
+  if(rec.nivel)student.nivel=rec.nivel;
+  if(rec.comisionNombre)student.comision=rec.comisionNombre;
+  if(rec.turnoPreferido)student.turno=rec.turnoPreferido;
+  if(!student.fechaIngreso)student.fechaIngreso=rec.fechaSolicitud||"";
+ }
+ rec.alumnoId=student.id;
+}
+function exportEnrollmentsCSV(){
+ const headers=["Código","Nombre","Apellido","Documento","Email","Teléfono","Responsable","Disciplina","Nivel","Comisión","Turno preferido","Materias solicitadas","Fecha solicitud","Período","Fecha entrevista","Responsable admisión","Estado","Legajo","Documentación","Observaciones"];
+ const rows=data.inscripciones.map(x=>[x.codigo,x.nombre,x.apellido,x.documento,x.email,x.telefono,x.responsable,x.disciplina,x.nivel,x.comisionNombre,x.turnoPreferido,x.materiasSolicitadas,x.fechaSolicitud,x.periodo,x.fechaEntrevista,x.responsableAdmision,x.estado,x.alumnoId,(x.documentacion||[]).map((v,i)=>v?["Formulario","Identidad","Contacto","Autorización","Entrevista","Evaluación"][i]:"").filter(Boolean).join(", "),x.observaciones]);
+ downloadCSV("iarte-inscripciones.csv",[headers,...rows]);
+}
+document.addEventListener("click",e=>{
+ const add=e.target.closest("[data-enrollment-add]");if(add){openEnrollmentForm();return}
+ const edit=e.target.closest("[data-enrollment-edit]");if(edit){openEnrollmentForm(edit.dataset.enrollmentEdit);return}
+ const del=e.target.closest("[data-enrollment-delete]");if(del&&confirm("¿Eliminar esta inscripción? El legajo ya generado no se elimina.")){data.inscripciones=data.inscripciones.filter(x=>x.id!==del.dataset.enrollmentDelete);saveData();render();toast("Inscripción eliminada")}
 });
