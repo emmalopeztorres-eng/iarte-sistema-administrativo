@@ -118,3 +118,9 @@
 .cash-modal textarea{resize:vertical;font-family:"DM Sans",sans-serif}
 .cash-modal .full-field{grid-column:1/-1}
 @media(max-width:650px){.cash-modal{padding:16px}.cash-modal .form-row{grid-template-columns:1fr}}
+
+/* Personal y recursos humanos */
+.staff-modal{width:min(850px,100%);max-height:90vh;overflow:auto}
+.staff-modal .form-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+.staff-modal textarea{resize:vertical;font-family:"DM Sans",sans-serif}
+@media(max-width:650px){.staff-modal{padding:16px}.staff-modal .form-row{grid-template-columns:1fr}}
