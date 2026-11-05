@@ -57,3 +57,13 @@
 .schedule-actions{display:flex;gap:8px}
 .empty-day{font-size:10px;color:var(--muted);margin:0;padding:6px 0}
 @media(max-width:650px){.schedule-modal .form-row{grid-template-columns:1fr}.schedule-entry{align-items:flex-start;flex-wrap:wrap}.schedule-actions{margin-left:105px}}
+
+
+/* Registro de asistencia */
+.attendance-modal{width:min(1050px,100%);max-height:90vh;overflow:auto}
+.attendance-modal .form-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+.attendance-roster-wrap{max-height:48vh;overflow:auto;margin:12px 0}
+.attendance-roster-wrap .data-table{min-width:850px}
+.attendance-roster-wrap .field-input{max-width:150px;padding:7px 8px;font-size:10px}
+.attendance-roster-notice{margin:10px 0}
+@media(max-width:650px){.attendance-modal{padding:16px}.attendance-modal .form-row{grid-template-columns:1fr}.attendance-roster-wrap{max-height:42vh}}
