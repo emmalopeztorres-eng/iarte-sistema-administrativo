@@ -124,3 +124,13 @@
 .staff-modal .form-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
 .staff-modal textarea{resize:vertical;font-family:"DM Sans",sans-serif}
 @media(max-width:650px){.staff-modal{padding:16px}.staff-modal .form-row{grid-template-columns:1fr}}
+
+/* Notas, boletines e informes para las familias */
+.report-preview-modal{width:min(900px,100%);max-height:94vh;overflow:auto}
+.report-preview-modal .family-report{background:#fff;color:#202020;padding:30px;border-radius:8px;line-height:1.55}
+.family-report header{border-bottom:2px solid #333;padding-bottom:16px;margin-bottom:22px}
+.family-report h1{font-size:26px;margin:8px 0}.family-report h2{font-size:16px;margin:24px 0 8px;border-bottom:1px solid #ddd;padding-bottom:6px}
+.family-report p{margin:6px 0;white-space:normal}.family-report table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+.family-report th,.family-report td{border:1px solid #ddd;padding:8px;text-align:left;vertical-align:top}
+.family-report footer{margin-top:35px;border-top:1px solid #ccc;padding-top:12px}
+@media(max-width:650px){.report-preview-modal{padding:12px}.report-preview-modal .family-report{padding:14px}.family-report h1{font-size:21px}}
