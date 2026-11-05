@@ -225,3 +225,75 @@ function exportTeachersCSV(){
   const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="iarte-docentes-demo.csv";a.click();URL.revokeObjectURL(url);toast("Archivo CSV preparado");
 }
 document.addEventListener("click",e=>{const profile=e.target.closest("[data-teacher-profile]");if(profile)showTeacherProfile(profile.dataset.teacherProfile)});
+
+
+// ===== MÓDULO DE ORGANIZACIÓN ACADÉMICA =====
+const academicDefinitions={
+ departamentos:{label:"Departamentos",singular:"departamento",fields:[["nombre","Nombre del departamento","text",true],["codigo","Código interno","text",false],["responsable","Responsable / coordinación","text",false],["descripcion","Descripción y alcance","textarea",false]]},
+ disciplinas:{label:"Disciplinas",singular:"disciplina",fields:[["nombre","Nombre de la disciplina","text",true],["departamentoId","Departamento","relation:departamentos",false],["codigo","Código interno","text",false],["descripcion","Descripción","textarea",false]]},
+ niveles:{label:"Niveles",singular:"nivel",fields:[["nombre","Nombre del nivel","text",true],["disciplinaId","Disciplina","relation:disciplinas",false],["edadDesde","Edad orientativa desde","number",false],["edadHasta","Edad orientativa hasta","number",false],["orden","Orden / progresión","number",false],["descripcion","Descripción y objetivos","textarea",false]]},
+ materias:{label:"Materias",singular:"materia",fields:[["nombre","Nombre de la materia","text",true],["disciplinaId","Disciplina","relation:disciplinas",false],["nivelId","Nivel","relation:niveles",false],["correlativas","Correlatividades / requisitos","text",false],["cargaHoraria","Horas semanales","number",false],["descripcion","Contenidos y objetivos","textarea",false]]},
+ planes:{label:"Planes de estudio",singular:"plan de estudio",fields:[["nombre","Nombre del plan","text",true],["disciplinaId","Disciplina","relation:disciplinas",false],["nivelId","Nivel","relation:niveles",false],["duracion","Duración estimada","text",false],["materias","Materias incluidas","textarea",false],["vigencia","Vigencia / ciclo lectivo","text",false],["descripcion","Fundamentación y objetivos","textarea",false]]},
+ comisiones:{label:"Comisiones",singular:"comisión",fields:[["nombre","Nombre de la comisión","text",true],["codigo","Código de comisión","text",true],["disciplinaId","Disciplina","relation:disciplinas",false],["nivelId","Nivel","relation:niveles",false],["materiaId","Materia principal","relation:materias",false],["docenteId","Docente responsable","relation:docentes",false],["turno","Turno","select:Mañana|Tarde|Noche|Intensivo",false],["dias","Días de cursada","text",false],["horario","Horario","text",false],["aula","Aula asignada","text",false],["cupo","Cupo máximo","number",false],["ciclo","Ciclo lectivo","text",false],["estado","Estado","select:Activa|Completa|En preparación|Finalizada",false]]}
+};
+const academicKeys=Object.keys(academicDefinitions);
+if(!data.academia)data.academia={};
+academicKeys.forEach(k=>{if(!Array.isArray(data.academia[k]))data.academia[k]=[]});
+let academicCategory="departamentos";
+function academicName(type,id){const item=(data.academia[type]||[]).find(x=>x.id===id);return item?item.nombre:"Sin asignar"}
+function academicTeacherName(id){const item=data.docentes.find(x=>x.id===id);return item?teacherFullName(item):"Sin asignar"}
+function academicValue(type,item,field){
+ const v=item[field];if(!v)return "—";
+ if(field.endsWith("Id")){const rel=field.slice(0,-2);if(rel==="docente")return academicTeacherName(v);return academicName(rel+"s",v)}
+ return v;
+}
+function renderGeneric(type){
+ if(type!=="academico")return renderOriginalGeneric(type);
+ const total=academicKeys.reduce((n,k)=>n+data.academia[k].length,0);
+ root.innerHTML=heading("ESTRUCTURA ACADÉMICA","Organización académica","Construí la estructura de iArte y vinculá departamentos, disciplinas, niveles, materias, planes y comisiones.",'<button class="primary-btn" data-academic-add="1">＋ Nuevo registro</button>')+
+ '<div class="stats-grid">'+stat("Departamentos",data.academia.departamentos.length,"Áreas organizativas","▤","lav")+stat("Disciplinas",data.academia.disciplinas.length,"Campos de formación","✧","mint")+stat("Materias",data.academia.materias.length,"Asignaturas definidas","▦","peach")+stat("Comisiones",data.academia.comisiones.length,"Grupos de cursada","♧","sky")+'</div>'+
+ '<div class="notice"><strong>Estructura relacionada:</strong> creá primero los departamentos y disciplinas; después los niveles y materias; por último, armá planes y comisiones. Los selectores permiten vincular registros ya creados. Los datos de docentes se toman del módulo Docentes.</div>'+
+ '<div class="academic-layout"><aside class="academic-tabs">'+academicKeys.map(k=>'<button class="academic-tab '+(academicCategory===k?'active':'')+'" data-academic-tab="'+k+'"><span>'+academicDefinitions[k].label+'</span><b>'+data.academia[k].length+'</b></button>').join("")+'</aside><section class="panel academic-content"><div class="panel-head"><div><h2>'+academicDefinitions[academicCategory].label+'</h2><div class="panel-sub">Administración de '+academicDefinitions[academicCategory].label.toLowerCase()+' institucionales</div></div><button class="primary-btn" data-academic-add="1">＋ Agregar</button></div><div class="toolbar"><input class="search-input" id="academicSearch" placeholder="Buscar en '+academicDefinitions[academicCategory].label.toLowerCase()+'..."><button class="secondary-btn" id="academicExport">Exportar CSV</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr>'+academicTableHeaders(academicCategory)+'</tr></thead><tbody id="academicRows">'+academicRows(academicCategory,data.academia[academicCategory])+'</tbody></table></div><p class="panel-sub">Registros en esta categoría: <strong>'+data.academia[academicCategory].length+'</strong> · Total de registros académicos: '+total+'</p></section></div>';
+ document.getElementById("academicSearch").addEventListener("input",e=>{const q=e.target.value.toLowerCase();document.getElementById("academicRows").innerHTML=academicRows(academicCategory,data.academia[academicCategory].filter(x=>JSON.stringify(x).toLowerCase().includes(q)))});
+ document.getElementById("academicExport").onclick=exportAcademicCSV;
+}
+const renderOriginalGeneric=renderGeneric;
+function academicTableHeaders(type){const d=academicDefinitions[type];let fields=d.fields.filter(f=>["nombre","codigo","responsable","departamentoId","disciplinaId","nivelId","materiaId","docenteId","turno","dias","horario","cupo","estado","vigencia"].includes(f[0])).slice(0,5);return fields.map(f=>'<th>'+f[1]+'</th>').join("")+'<th>Acciones</th>'}
+function academicRows(type,rows){
+ const fields=academicDefinitions[type].fields.filter(f=>["nombre","codigo","responsable","departamentoId","disciplinaId","nivelId","materiaId","docenteId","turno","dias","horario","cupo","estado","vigencia"].includes(f[0])).slice(0,5);
+ if(!rows.length)return '<tr><td colspan="7" class="empty-note">Todavía no hay registros en esta categoría. Usá “Agregar” para crear el primero.</td></tr>';
+ return rows.map(x=>'<tr>'+fields.map(f=>'<td>'+escapeHTML(academicValue(type,x,f[0]))+'</td>').join("")+'<td><button class="text-link" data-academic-edit="'+escapeHTML(x.id)+'">Editar</button> <button class="text-link" data-academic-delete="'+escapeHTML(x.id)+'">Eliminar</button></td></tr>').join("");
+}
+function academicRelationOptions(target,selected){
+ let options=[];
+ if(target==="docentes")options=data.docentes.map(t=>({id:t.id,name:teacherFullName(t)}));
+ else options=(data.academia[target]||[]).map(x=>({id:x.id,name:x.nombre}));
+ return '<option value="">Sin asignar</option>'+options.map(o=>'<option value="'+escapeHTML(o.id)+'" '+(selected===o.id?'selected':'')+'>'+escapeHTML(o.name)+'</option>').join("");
+}
+function openAcademicForm(id=null){
+ const type=academicCategory,definition=academicDefinitions[type],existing=id?data.academia[type].find(x=>x.id===id):null;
+ const fields=definition.fields.map(f=>{
+  const [key,label,kind,required]=f,value=existing?.[key]??"";
+  let control="";
+  if(kind.startsWith("relation:"))control='<select class="field-input" name="'+key+'">'+academicRelationOptions(kind.split(":")[1],value)+'</select>';
+  else if(kind.startsWith("select:"))control='<select class="field-input" name="'+key+'">'+kind.slice(7).split("|").map(o=>'<option '+(value===o?'selected':'')+'>'+o+'</option>').join("")+'</select>';
+  else if(kind==="textarea")control='<textarea class="field-input" name="'+key+'" rows="3">'+escapeHTML(value)+'</textarea>';
+  else control='<input class="field-input" name="'+key+'" type="'+kind+'" value="'+escapeHTML(value)+'" '+(required?'required':'')+'>';
+  return '<div class="form-field '+(kind==="textarea"?'full-field':'')+'"><label>'+label+'</label>'+control+'</div>';
+ }).join("");
+ const backdrop=document.createElement("div");backdrop.className="modal-backdrop";
+ backdrop.innerHTML='<form class="modal academic-modal" id="academicForm"><h2>'+(existing?"Editar ":"Nuevo ")+definition.singular+'</h2><p>Completá los datos y vinculalos con los registros disponibles.</p><div class="form-row">'+fields+'</div><div class="modal-actions"><button type="button" class="secondary-btn" id="cancelAcademic">Cancelar</button><button class="primary-btn" type="submit">Guardar</button></div></form>';
+ document.body.appendChild(backdrop);document.getElementById("cancelAcademic").onclick=()=>backdrop.remove();backdrop.addEventListener("click",e=>{if(e.target===backdrop)backdrop.remove()});
+ document.getElementById("academicForm").onsubmit=e=>{e.preventDefault();const record=Object.fromEntries(new FormData(e.target).entries());if(existing)Object.assign(existing,record);else{record.id="AC-"+type.slice(0,3).toUpperCase()+"-"+String(Date.now()).slice(-7);data.academia[type].push(record)}data.actividades.unshift({icon:"▤",title:existing?"Estructura académica actualizada":"Nuevo registro académico",detail:record.nombre||definition.singular,time:"Ahora"});saveData();backdrop.remove();render();toast(existing?"Registro actualizado":"Registro académico creado")};
+}
+function exportAcademicCSV(){
+ const type=academicCategory,fields=academicDefinitions[type].fields,rows=data.academia[type],headers=["ID",...fields.map(f=>f[1])];
+ const csv=[headers,...rows.map(x=>[x.id,...fields.map(f=>academicValue(type,x,f[0])==="—"?"":academicValue(type,x,f[0]))])].map(row=>row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\n");
+ const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="iarte-"+type+".csv";a.click();URL.revokeObjectURL(url);toast("CSV preparado");
+}
+document.addEventListener("click",e=>{
+ const tab=e.target.closest("[data-academic-tab]");if(tab){academicCategory=tab.dataset.academicTab;render();return}
+ if(e.target.closest("[data-academic-add]")){openAcademicForm();return}
+ const edit=e.target.closest("[data-academic-edit]");if(edit){openAcademicForm(edit.dataset.academicEdit);return}
+ const del=e.target.closest("[data-academic-delete]");if(del&&confirm("¿Eliminar este registro? Las referencias vinculadas podrían quedar sin asignar.")){data.academia[academicCategory]=data.academia[academicCategory].filter(x=>x.id!==del.dataset.academicDelete);saveData();render();toast("Registro eliminado")}
+});
