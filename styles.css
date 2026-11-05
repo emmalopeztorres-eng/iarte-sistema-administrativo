@@ -110,3 +110,11 @@
 .enrollment-steps b{display:grid;place-items:center;flex:0 0 25px;height:25px;border-radius:50%;background:#f0edfa;color:var(--purple);font-size:11px}
 .enrollment-steps span{font-size:10px;color:var(--ink);line-height:1.35}
 @media(max-width:700px){.enrollment-modal{padding:16px}.enrollment-modal .form-row,.enrollment-checklist{grid-template-columns:1fr}.enrollment-steps{grid-template-columns:1fr 1fr}}
+
+/* Caja y cobranzas */
+.cash-modal{width:min(900px,100%);max-height:90vh;overflow:auto}
+.cash-modal .form-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+.cash-modal .form-field{min-width:0}
+.cash-modal textarea{resize:vertical;font-family:"DM Sans",sans-serif}
+.cash-modal .full-field{grid-column:1/-1}
+@media(max-width:650px){.cash-modal{padding:16px}.cash-modal .form-row{grid-template-columns:1fr}}
