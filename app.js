@@ -248,6 +248,7 @@ function academicValue(type,item,field){
  return v;
 }
 function renderGeneric(type){
+ if(type==="asistencia")return renderAttendanceModule();
  if(type==="horarios")return renderScheduleModule();
  if(type!=="academico")return renderOriginalGeneric(type);
  const total=academicKeys.reduce((n,k)=>n+data.academia[k].length,0);
@@ -352,3 +353,83 @@ document.addEventListener("input",e=>{if(e.target.id==="roomSearch"){const q=e.t
 document.addEventListener("change",e=>{if(e.target.id==="dayFilter"){document.querySelectorAll(".schedule-day").forEach(el=>el.style.display=e.target.value==="Todos"||el.querySelector("h3").textContent===e.target.value?"":"none")}});
 document.addEventListener("click",e=>{if(e.target.id==="roomExport")exportScheduleCSV("rooms");if(e.target.id==="classExport")exportScheduleCSV("classes")});
 function exportScheduleCSV(kind){const rows=kind==="rooms"?data.espacios:data.clases;const headers=kind==="rooms"?["Nombre","Código","Tipo","Capacidad","Equipamiento","Estado"]:["Día","Inicio","Fin","Comisión","Materia","Docente","Aula","Observaciones"];const values=kind==="rooms"?rows.map(x=>[x.nombre,x.codigo,x.tipo,x.capacidad,x.equipamiento,x.estado]):rows.map(x=>[x.dia,x.inicio,x.fin,scheduleCommissionName(x.comisionId),scheduleSubjectName(x.materiaId),scheduleTeacherName(x.docenteId),scheduleRoomName(x.aulaId),x.observaciones]);const csv=[headers,...values].map(row=>row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\n");const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="iarte-"+kind+".csv";a.click();URL.revokeObjectURL(url);toast("CSV preparado")}
+
+
+// ===== MÓDULO DE ASISTENCIA =====
+if(!Array.isArray(data.asistencias))data.asistencias=[];
+let attendanceFilter="Todas";
+function attendanceStudentName(id){const x=data.alumnos.find(s=>s.id===id);return x?studentFullName(x):"Alumno eliminado"}
+function attendanceClassLabel(c){return [scheduleSubjectName(c.materiaId),scheduleCommissionName(c.comisionId),c.dia,c.inicio].filter(Boolean).join(" · ")}
+function attendanceRoster(comisionId){
+ const active=data.alumnos.filter(s=>(s.estado||"Activo")==="Activo");
+ const commission=data.academia.comisiones.find(c=>c.id===comisionId);
+ if(!commission)return active;
+ const keys=[commission.nombre,commission.codigo,commission.id].filter(Boolean).map(x=>String(x).trim().toLowerCase());
+ const matched=active.filter(s=>keys.includes(String(s.comision||"").trim().toLowerCase()));
+ return matched.length?matched:active;
+}
+function attendanceStats(){
+ const all=data.asistencias.flatMap(x=>x.registros||[]);
+ const total=all.length,present=all.filter(x=>x.estado==="Presente").length;
+ return {sessions:data.asistencias.length,total,present,absent:all.filter(x=>x.estado==="Ausente").length,late:all.filter(x=>x.estado==="Tarde").length,rate:total?Math.round(present/total*100):0};
+}
+function renderAttendanceModule(){
+ const st=attendanceStats(),sessions=[...data.asistencias].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+ root.innerHTML=heading("SEGUIMIENTO ACADÉMICO","Asistencia","Registrá la asistencia por clase y conservá el historial de cada estudiante.",'<button class="primary-btn" data-attendance-new="1">＋ Tomar asistencia</button>')+
+ '<div class="stats-grid">'+stat("Clases registradas",st.sessions,"Sesiones cargadas","◷","lav")+stat("Presentes",st.present,"Registros de presencia","✓","mint")+stat("Ausentes",st.absent,"Inasistencias registradas","!","peach")+stat("Presentismo",st.rate+"%","Sobre todos los registros","▥","sky")+'</div>'+
+ '<div class="notice"><strong>Registro por clase:</strong> seleccioná una clase programada, la fecha y cargá el estado de cada alumno. Podés registrar presentes, ausentes y llegadas tarde, agregar minutos de demora y justificar inasistencias. El listado de alumnos intenta vincularse con la comisión; si no encuentra coincidencias, muestra los alumnos activos para que puedas revisar el padrón.</div>'+
+ '<div class="toolbar"><input class="search-input" id="attendanceSearch" placeholder="Buscar por materia, comisión o docente..."><select class="field-select" id="attendanceStatusFilter"><option>Todas</option><option>Con ausencias</option><option>Con llegadas tarde</option></select><button class="secondary-btn" id="attendanceExport">Exportar CSV</button></div>'+
+ '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Fecha</th><th>Clase / materia</th><th>Comisión</th><th>Docente</th><th>Presentes</th><th>Ausentes</th><th>Tarde</th><th>Acciones</th></tr></thead><tbody id="attendanceRows">'+attendanceRows(sessions)+'</tbody></table></div>'+
+ '<p class="panel-sub" style="margin:12px 2px">Sesiones guardadas: <strong>'+sessions.length+'</strong>. Cada registro conserva el detalle individual de la clase.</p>';
+ document.getElementById("attendanceSearch").addEventListener("input",applyAttendanceFilters);
+ document.getElementById("attendanceStatusFilter").addEventListener("change",applyAttendanceFilters);
+ document.getElementById("attendanceExport").onclick=exportAttendanceCSV;
+}
+function attendanceRows(rows){
+ if(!rows.length)return '<tr><td colspan="8" class="empty-note">Todavía no hay asistencias registradas. Seleccioná “Tomar asistencia” para cargar la primera clase.</td></tr>';
+ return rows.map(x=>{const r=x.registros||[],p=r.filter(z=>z.estado==="Presente").length,a=r.filter(z=>z.estado==="Ausente").length,t=r.filter(z=>z.estado==="Tarde").length;return '<tr><td>'+escapeHTML(x.fecha)+'</td><td>'+escapeHTML(x.materiaNombre||"—")+'</td><td>'+escapeHTML(x.comisionNombre||"—")+'</td><td>'+escapeHTML(x.docenteNombre||"—")+'</td><td>'+p+'</td><td>'+a+'</td><td>'+t+'</td><td><button class="text-link" data-attendance-edit="'+x.id+'">Ver / editar</button> <button class="text-link" data-attendance-delete="'+x.id+'">Eliminar</button></td></tr>'}).join("");
+}
+function applyAttendanceFilters(){
+ const q=document.getElementById("attendanceSearch").value.toLowerCase(),f=document.getElementById("attendanceStatusFilter").value;
+ const rows=data.asistencias.filter(x=>JSON.stringify([x.fecha,x.materiaNombre,x.comisionNombre,x.docenteNombre]).toLowerCase().includes(q)&&(f==="Todas"||(f==="Con ausencias"&&(x.registros||[]).some(r=>r.estado==="Ausente"))||(f==="Con llegadas tarde"&&(x.registros||[]).some(r=>r.estado==="Tarde"))));
+ document.getElementById("attendanceRows").innerHTML=attendanceRows(rows);
+}
+function openAttendanceForm(id=null){
+ const old=id?data.asistencias.find(x=>x.id===id):null;
+ if(!old&&!data.clases.length){toast("Primero programá las clases en Horarios y aulas");return}
+ const planned=old?data.clases.find(c=>c.id===old.claseId):null;
+ const date=old?.fecha||new Date().toISOString().slice(0,10);
+ const classOptions=data.clases.map(c=>'<option value="'+escapeHTML(c.id)+'" '+((old?.claseId||"")===c.id?'selected':'')+'>'+escapeHTML(attendanceClassLabel(c))+'</option>').join("");
+ const classForRoster=planned||(data.clases.find(c=>c.id===data.clases[0]?.id));
+ const roster=attendanceRoster(old?.comisionId||classForRoster?.comisionId||"");
+ const existingMap=new Map((old?.registros||[]).map(r=>[r.alumnoId,r]));
+ const b=document.createElement("div");b.className="modal-backdrop";
+ const rosterRows=roster.map(st=>{const rec=existingMap.get(st.id)||{};return '<tr><td>'+escapeHTML(st.id)+'</td><td>'+escapeHTML(studentFullName(st))+'</td><td><select class="field-input attendance-state" data-student="'+escapeHTML(st.id)+'">'+["Presente","Ausente","Tarde"].map(v=>'<option '+((rec.estado||"Presente")===v?'selected':'')+'>'+v+'</option>').join("")+'</select></td><td><input class="field-input attendance-minutes" data-student="'+escapeHTML(st.id)+'" type="number" min="0" max="240" placeholder="Min." value="'+escapeHTML(rec.minutosTarde||"")+'" '+(rec.estado==="Tarde"?"":"disabled")+'></td><td><input class="field-input attendance-reason" data-student="'+escapeHTML(st.id)+'" placeholder="Motivo / justificación" value="'+escapeHTML(rec.justificacion||"")+'"></td><td><input class="field-input attendance-note" data-student="'+escapeHTML(st.id)+'" placeholder="Observación" value="'+escapeHTML(rec.observaciones||"")+'"></td></tr>'}).join("");
+ b.innerHTML='<form class="modal attendance-modal" id="attendanceForm"><h2>'+(old?"Editar registro de asistencia":"Tomar asistencia")+'</h2><p>Elegí una clase y completá el estado de cada estudiante.</p><div class="form-row"><div class="form-field"><label>Fecha de la clase *</label><input class="field-input" type="date" name="fecha" required value="'+escapeHTML(date)+'"></div><div class="form-field"><label>Clase programada *</label><select class="field-input" name="claseId" required>'+classOptions+'</select></div></div><div class="notice attendance-roster-notice">Padrón sugerido: '+roster.length+' alumnos activos. Revisá que la comisión seleccionada corresponda al grupo que asistió.</div><div class="data-table-wrap attendance-roster-wrap"><table class="data-table"><thead><tr><th>Legajo</th><th>Alumno/a</th><th>Estado</th><th>Demora</th><th>Justificación</th><th>Observación</th></tr></thead><tbody>'+rosterRows+'</tbody></table></div><div class="modal-actions"><button type="button" class="secondary-btn" id="cancelAttendance">Cancelar</button><button class="primary-btn">Guardar asistencia</button></div></form>';
+ document.body.appendChild(b);document.getElementById("cancelAttendance").onclick=()=>b.remove();b.addEventListener("click",e=>{if(e.target===b)b.remove()});
+ b.querySelectorAll(".attendance-state").forEach(sel=>sel.addEventListener("change",()=>{const m=b.querySelector('.attendance-minutes[data-student="'+sel.dataset.student+'"]');m.disabled=sel.value!=="Tarde";if(m.disabled)m.value=""}));
+ document.getElementById("attendanceForm").onsubmit=e=>{
+  e.preventDefault();const form=Object.fromEntries(new FormData(e.target)),cl=data.clases.find(c=>c.id===form.claseId);
+  if(!cl){toast("La clase seleccionada ya no está disponible");return}
+  const registros=roster.map(st=>{const id=st.id,estado=b.querySelector('.attendance-state[data-student="'+id+'"]').value;return {alumnoId:id,estado,minutosTarde:estado==="Tarde"?b.querySelector('.attendance-minutes[data-student="'+id+'"]').value:"",justificacion:b.querySelector('.attendance-reason[data-student="'+id+'"]').value,observaciones:b.querySelector('.attendance-note[data-student="'+id+'"]').value}});
+  const duplicate=data.asistencias.find(x=>x.id!==old?.id&&x.fecha===form.fecha&&x.claseId===cl.id);
+  if(duplicate){toast("Ya existe una asistencia para esa clase y fecha. Abrí el registro existente para editarlo.");return}
+  const record={id:old?.id||"ASI-"+String(Date.now()).slice(-8),fecha:form.fecha,claseId:cl.id,comisionId:cl.comisionId,materiaId:cl.materiaId,docenteId:cl.docenteId,aulaId:cl.aulaId,materiaNombre:scheduleSubjectName(cl.materiaId),comisionNombre:scheduleCommissionName(cl.comisionId),docenteNombre:scheduleTeacherName(cl.docenteId),registros};
+  if(old)Object.assign(old,record);else data.asistencias.push(record);
+  saveData();b.remove();render();toast("Asistencia guardada correctamente");
+ };
+}
+document.addEventListener("click",e=>{
+ const add=e.target.closest("[data-attendance-new]");if(add){openAttendanceForm();return}
+ const edit=e.target.closest("[data-attendance-edit]");if(edit){openAttendanceForm(edit.dataset.attendanceEdit);return}
+ const del=e.target.closest("[data-attendance-delete]");if(del&&confirm("¿Eliminar esta sesión y sus registros individuales?")){data.asistencias=data.asistencias.filter(x=>x.id!==del.dataset.attendanceDelete);saveData();render();toast("Registro eliminado")}
+});
+document.addEventListener("change",e=>{
+ if(e.target.name==="claseId"&&e.target.closest("#attendanceForm")){toast("La lista de alumnos se determina al abrir el formulario. Cerralo y volvé a abrirlo para cargar el padrón de la nueva comisión.")}
+});
+function exportAttendanceCSV(){
+ const rows=[["Fecha","Materia","Comisión","Docente","Legajo","Alumno/a","Estado","Minutos tarde","Justificación","Observaciones"]];
+ data.asistencias.forEach(s=>(s.registros||[]).forEach(r=>rows.push([s.fecha,s.materiaNombre,s.comisionNombre,s.docenteNombre,r.alumnoId,attendanceStudentName(r.alumnoId),r.estado,r.minutosTarde,r.justificacion,r.observaciones])));
+ const csv=rows.map(row=>row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";")).join("\n");
+ const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="iarte-asistencia.csv";a.click();URL.revokeObjectURL(url);toast("CSV de asistencia preparado");
+}
