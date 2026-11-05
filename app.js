@@ -380,10 +380,15 @@ function renderAttendanceModule(){
  '<div class="notice"><strong>Registro por clase:</strong> seleccioná una clase programada, la fecha y cargá el estado de cada alumno. Podés registrar presentes, ausentes y llegadas tarde, agregar minutos de demora y justificar inasistencias. El listado de alumnos intenta vincularse con la comisión; si no encuentra coincidencias, muestra los alumnos activos para que puedas revisar el padrón.</div>'+
  '<div class="toolbar"><input class="search-input" id="attendanceSearch" placeholder="Buscar por materia, comisión o docente..."><select class="field-select" id="attendanceStatusFilter"><option>Todas</option><option>Con ausencias</option><option>Con llegadas tarde</option></select><button class="secondary-btn" id="attendanceExport">Exportar CSV</button></div>'+
  '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Fecha</th><th>Clase / materia</th><th>Comisión</th><th>Docente</th><th>Presentes</th><th>Ausentes</th><th>Tarde</th><th>Acciones</th></tr></thead><tbody id="attendanceRows">'+attendanceRows(sessions)+'</tbody></table></div>'+
- '<p class="panel-sub" style="margin:12px 2px">Sesiones guardadas: <strong>'+sessions.length+'</strong>. Cada registro conserva el detalle individual de la clase.</p>';
+ '<p class="panel-sub" style="margin:12px 2px">Sesiones guardadas: <strong>'+sessions.length+'</strong>. Cada registro conserva el detalle individual de la clase.</p>'+renderStudentAttendanceSummary();
  document.getElementById("attendanceSearch").addEventListener("input",applyAttendanceFilters);
  document.getElementById("attendanceStatusFilter").addEventListener("change",applyAttendanceFilters);
  document.getElementById("attendanceExport").onclick=exportAttendanceCSV;
+}
+function renderStudentAttendanceSummary(){
+ const rows=data.alumnos.filter(st=>data.asistencias.some(s=>(s.registros||[]).some(r=>r.alumnoId===st.id)));
+ const body=rows.length?rows.map(st=>{const records=data.asistencias.flatMap(s=>(s.registros||[]).filter(r=>r.alumnoId===st.id));const total=records.length,p=records.filter(r=>r.estado==="Presente").length,a=records.filter(r=>r.estado==="Ausente").length,t=records.filter(r=>r.estado==="Tarde").length,rate=total?Math.round((p+t)/total*100):0;return '<tr><td>'+escapeHTML(st.id)+'</td><td>'+escapeHTML(studentFullName(st))+'</td><td>'+total+'</td><td>'+p+'</td><td>'+a+'</td><td>'+t+'</td><td><strong>'+rate+'%</strong></td></tr>'}).join(""):'<tr><td colspan="7" class="empty-note">El resumen individual aparecerá cuando se registren asistencias.</td></tr>';
+ return '<section class="panel attendance-summary"><div class="panel-head"><div><h2>Resumen de asistencia por alumno</h2><div class="panel-sub">Presentismo acumulado según las sesiones registradas</div></div></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Legajo</th><th>Alumno/a</th><th>Clases</th><th>Presente</th><th>Ausente</th><th>Tarde</th><th>Presentismo</th></tr></thead><tbody>'+body+'</tbody></table></div></section>';
 }
 function attendanceRows(rows){
  if(!rows.length)return '<tr><td colspan="8" class="empty-note">Todavía no hay asistencias registradas. Seleccioná “Tomar asistencia” para cargar la primera clase.</td></tr>';
@@ -391,7 +396,7 @@ function attendanceRows(rows){
 }
 function applyAttendanceFilters(){
  const q=document.getElementById("attendanceSearch").value.toLowerCase(),f=document.getElementById("attendanceStatusFilter").value;
- const rows=data.asistencias.filter(x=>JSON.stringify([x.fecha,x.materiaNombre,x.comisionNombre,x.docenteNombre]).toLowerCase().includes(q)&&(f==="Todas"||(f==="Con ausencias"&&(x.registros||[]).some(r=>r.estado==="Ausente"))||(f==="Con llegadas tarde"&&(x.registros||[]).some(r=>r.estado==="Tarde"))));
+ const rows=data.asistencias.filter(x=>JSON.stringify([x.fecha,x.materiaNombre,x.comisionNombre,x.docenteNombre,(x.registros||[]).map(r=>attendanceStudentName(r.alumnoId)).join(" ")]).toLowerCase().includes(q)&&(f==="Todas"||(f==="Con ausencias"&&(x.registros||[]).some(r=>r.estado==="Ausente"))||(f==="Con llegadas tarde"&&(x.registros||[]).some(r=>r.estado==="Tarde"))));
  document.getElementById("attendanceRows").innerHTML=attendanceRows(rows);
 }
 function openAttendanceForm(id=null){
