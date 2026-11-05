@@ -131,3 +131,89 @@ function exportStudentsCSV(){
 document.addEventListener("click",e=>{const profile=e.target.closest("[data-profile]");if(profile)showStudentProfile(profile.dataset.profile)});
 
 render();
+
+// ===== MÓDULO DE DOCENTES: LEGAJOS INTEGRALES =====
+const teacherFields = [
+  {key:"nombre",label:"Nombre",type:"text",required:true,group:"Identificación"},
+  {key:"apellido",label:"Apellido",type:"text",required:true,group:"Identificación"},
+  {key:"email",label:"Correo institucional",type:"email",group:"Contacto"},
+  {key:"telefono",label:"Teléfono de contacto",type:"tel",group:"Contacto"},
+  {key:"area",label:"Departamento / área",type:"text",required:true,group:"Perfil profesional"},
+  {key:"especialidades",label:"Especialidades",type:"text",placeholder:"Ej.: danza clásica, jazz, contemporáneo",group:"Perfil profesional"},
+  {key:"formacion",label:"Formación / antecedentes",type:"textarea",group:"Perfil profesional"},
+  {key:"materias",label:"Materias que dicta",type:"textarea",placeholder:"Separar cada materia con coma",group:"Asignación académica"},
+  {key:"niveles",label:"Niveles habilitados",type:"text",placeholder:"Ej.: inicial, intermedio, avanzado",group:"Asignación académica"},
+  {key:"comisiones",label:"Comisiones asignadas",type:"textarea",placeholder:"Ej.: DAN-01, TM-03, CANTO-02",group:"Asignación académica"},
+  {key:"turnos",label:"Turnos disponibles",type:"text",placeholder:"Mañana, tarde, noche",group:"Disponibilidad"},
+  {key:"disponibilidad",label:"Días y franjas horarias",type:"textarea",placeholder:"Ej.: lunes 14 a 18; miércoles 9 a 13",group:"Disponibilidad"},
+  {key:"cargaHoraria",label:"Carga horaria semanal (horas)",type:"number",group:"Disponibilidad"},
+  {key:"fechaIngreso",label:"Fecha de ingreso",type:"date",group:"Vínculo institucional"},
+  {key:"modalidad",label:"Modalidad de contratación / vínculo",type:"text",group:"Vínculo institucional"},
+  {key:"estado",label:"Estado",type:"select",options:["Activo","Licencia","Inactivo","Baja"],group:"Vínculo institucional"},
+  {key:"observaciones",label:"Observaciones internas",type:"textarea",group:"Seguimiento"}
+];
+const renderStudentDirectory = renderDirectory;
+const openStudentOrTeacherForm = openForm;
+function teacherFullName(t){return [t.nombre,t.apellido].filter(Boolean).join(" ")||t.nombre||"Sin nombre"}
+function normalizeTeachers(){data.docentes=data.docentes.map(t=>({...t,apellido:t.apellido||"",estado:t.estado||"Activo"}))}
+normalizeTeachers();
+function renderDirectory(type){
+  if(type==="alumnos")return renderStudentDirectory(type);
+  if(type!=="docentes")return renderLegacyDirectory(type);
+  const rows=data.docentes;
+  root.innerHTML=heading("EQUIPO INSTITUCIONAL","Docentes","Legajos profesionales, asignaciones académicas, disponibilidad y seguimiento del equipo.",'<button class="primary-btn" data-action="docente">＋ Nuevo legajo</button>')+
+  '<div class="stats-grid">'+stat("Total de legajos",rows.length,"Docentes registrados","♙","lav")+stat("Activos",rows.filter(t=>(t.estado||"Activo")==="Activo").length,"Integrantes en actividad","✓","mint")+stat("En licencia",rows.filter(t=>t.estado==="Licencia").length,"Licencias registradas","◷","peach")+stat("Carga horaria semanal",rows.reduce((n,t)=>n+(Number(t.cargaHoraria)||0),0),"Horas declaradas en total","▤","sky")+'</div>'+
+  '<div class="notice"><strong>Legajo docente integral:</strong> permite registrar perfil profesional, formación, materias, niveles, comisiones, disponibilidad, carga horaria y vínculo institucional. Usá únicamente datos ficticios mientras el sistema siga funcionando en almacenamiento local.</div>'+
+  '<div class="toolbar"><input class="search-input" id="teacherSearch" placeholder="Buscar por nombre, área, materia o comisión..."><select class="field-select" id="teacherStatus"><option value="">Todos los estados</option><option>Activo</option><option>Licencia</option><option>Inactivo</option><option>Baja</option></select><select class="field-select" id="teacherArea"><option value="">Todas las áreas</option>'+[...new Set(rows.map(t=>t.area).filter(Boolean))].sort().map(x=>'<option>'+escapeHTML(x)+'</option>').join("")+'</select><button class="secondary-btn" id="exportTeachers">Exportar CSV</button></div>'+
+  '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Legajo</th><th>Docente</th><th>Área</th><th>Materias</th><th>Comisiones</th><th>Horas/sem.</th><th>Estado</th><th>Ficha</th></tr></thead><tbody id="teacherBody">'+teacherRows(rows)+'</tbody></table></div>'+
+  '<p class="panel-sub" style="margin:12px 2px">Total de docentes: <strong>'+rows.length+'</strong> · Abrí cada ficha para consultar o modificar su legajo.</p>';
+  const apply=()=>{const q=document.getElementById("teacherSearch").value.toLowerCase(),st=document.getElementById("teacherStatus").value,area=document.getElementById("teacherArea").value;const filtered=data.docentes.filter(t=>(!st||t.estado===st)&&(!area||t.area===area)&&JSON.stringify(t).toLowerCase().includes(q));document.getElementById("teacherBody").innerHTML=teacherRows(filtered)};
+  document.getElementById("teacherSearch").addEventListener("input",apply);
+  document.getElementById("teacherStatus").addEventListener("change",apply);
+  document.getElementById("teacherArea").addEventListener("change",apply);
+  document.getElementById("exportTeachers").onclick=exportTeachersCSV;
+}
+function teacherRows(rows){
+  if(!rows.length)return '<tr><td colspan="8" class="empty-note">No hay docentes que coincidan con los filtros.</td></tr>';
+  return rows.map(t=>'<tr><td>'+escapeHTML(t.id)+'</td><td>'+escapeHTML(teacherFullName(t))+'</td><td>'+escapeHTML(t.area||"—")+'</td><td>'+escapeHTML(t.materias||t.materia||"—")+'</td><td>'+escapeHTML(t.comisiones||"—")+'</td><td>'+escapeHTML(t.cargaHoraria||"—")+'</td><td><span class="status '+(t.estado==="Licencia"||t.estado==="Inactivo"||t.estado==="Baja"?"pending":"")+'">'+escapeHTML(t.estado||"Activo")+'</span></td><td><button class="text-link" data-teacher-profile="'+escapeHTML(t.id)+'">Ver ficha →</button></td></tr>').join("");
+}
+function openForm(type,teacherId=null){
+  if(type==="alumno")return openStudentOrTeacherForm(type,teacherId);
+  if(type!=="docente")return openLegacyForm(type);
+  const existing=teacherId?data.docentes.find(t=>t.id===teacherId):null;
+  const groups=[...new Set(teacherFields.map(f=>f.group))];
+  const fieldsHTML=groups.map(group=>'<div class="form-section-title">'+group+'</div><div class="form-row">'+teacherFields.filter(f=>f.group===group).map(f=>{
+    const value=existing?.[f.key]||"";
+    if(f.type==="textarea")return '<div class="form-field full-field"><label for="tf-'+f.key+'">'+f.label+'</label><textarea class="field-input" id="tf-'+f.key+'" name="'+f.key+'" rows="3" placeholder="'+escapeHTML(f.placeholder||"")+'">'+escapeHTML(value)+'</textarea></div>';
+    if(f.type==="select")return '<div class="form-field"><label for="tf-'+f.key+'">'+f.label+'</label><select class="field-input" id="tf-'+f.key+'" name="'+f.key+'">'+f.options.map(o=>'<option '+((value||"Activo")===o?'selected':'')+'>'+o+'</option>').join("")+'</select></div>';
+    return '<div class="form-field"><label for="tf-'+f.key+'">'+f.label+'</label><input class="field-input" id="tf-'+f.key+'" name="'+f.key+'" type="'+f.type+'" value="'+escapeHTML(value)+'" placeholder="'+escapeHTML(f.placeholder||"")+'" '+(f.required?'required':'')+'></div>';
+  }).join("")+'</div>').join("");
+  const backdrop=document.createElement("div");backdrop.className="modal-backdrop";
+  backdrop.innerHTML='<form class="modal teacher-modal" id="teacherForm"><h2>'+(existing?"Editar legajo docente":"Nuevo legajo docente")+'</h2><p>La ficha reúne información profesional, académica, horaria y administrativa.</p>'+fieldsHTML+'<div class="modal-actions"><button type="button" class="secondary-btn" id="cancelTeacher">Cancelar</button><button class="primary-btn" type="submit">Guardar legajo</button></div></form>';
+  document.body.appendChild(backdrop);
+  document.getElementById("cancelTeacher").onclick=()=>backdrop.remove();
+  backdrop.addEventListener("click",e=>{if(e.target===backdrop)backdrop.remove()});
+  document.getElementById("teacherForm").onsubmit=e=>{
+    e.preventDefault();const record=Object.fromEntries(new FormData(e.target).entries());
+    record.cargaHoraria=record.cargaHoraria===""?"":Number(record.cargaHoraria);
+    if(existing)Object.assign(existing,record);
+    else{record.id="DOC-"+String(Date.now()).slice(-7);data.docentes.push(record)}
+    data.actividades.unshift({icon:existing?"✎":"＋",title:existing?"Legajo docente actualizado":"Nuevo docente registrado",detail:teacherFullName(record),time:"Ahora"});
+    saveData();backdrop.remove();render();toast(existing?"Legajo actualizado":"Docente registrado correctamente");
+  };
+}
+function showTeacherProfile(id){
+  const t=data.docentes.find(x=>x.id===id);if(!t)return;
+  const groups=[["Identificación",["nombre","apellido"]],["Contacto",["email","telefono"]],["Perfil profesional",["area","especialidades","formacion"]],["Asignación académica",["materias","niveles","comisiones"]],["Disponibilidad",["turnos","disponibilidad","cargaHoraria"]],["Vínculo institucional",["fechaIngreso","modalidad","estado"]],["Seguimiento",["observaciones"]]];
+  const labels=Object.fromEntries(teacherFields.map(f=>[f.key,f.label]));
+  const backdrop=document.createElement("div");backdrop.className="modal-backdrop";
+  backdrop.innerHTML='<section class="modal teacher-modal"><div class="profile-heading"><div><div class="eyebrow">LEGAJO '+escapeHTML(t.id)+'</div><h2>'+escapeHTML(teacherFullName(t))+'</h2><p>'+escapeHTML(t.area||"Área sin asignar")+' · Ficha profesional</p></div><span class="status">'+escapeHTML(t.estado||"Activo")+'</span></div>'+groups.map(([g,keys])=>'<div class="profile-group"><h3>'+g+'</h3><div class="profile-fields">'+keys.map(k=>'<div><small>'+labels[k]+'</small><strong>'+escapeHTML(t[k]===0?"0":t[k]||"Sin información")+'</strong></div>').join("")+'</div></div>').join("")+'<div class="modal-actions"><button type="button" class="secondary-btn" id="closeTeacher">Cerrar</button><button type="button" class="primary-btn" id="editTeacher">Editar legajo</button></div></section>';
+  document.body.appendChild(backdrop);document.getElementById("closeTeacher").onclick=()=>backdrop.remove();backdrop.addEventListener("click",e=>{if(e.target===backdrop)backdrop.remove()});document.getElementById("editTeacher").onclick=()=>{backdrop.remove();openForm("docente",id)};
+}
+function exportTeachersCSV(){
+  const headers=["Legajo",...teacherFields.map(f=>f.label)];
+  const rows=data.docentes.map(t=>[t.id,...teacherFields.map(f=>t[f.key]??"")]);
+  const csv=[headers,...rows].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\n");
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="iarte-docentes-demo.csv";a.click();URL.revokeObjectURL(url);toast("Archivo CSV preparado");
+}
+document.addEventListener("click",e=>{const profile=e.target.closest("[data-teacher-profile]");if(profile)showTeacherProfile(profile.dataset.teacherProfile)});
