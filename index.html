@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sistema administrativo integral de iArte">
+  <title>iArte | Sistema administrativo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#" aria-label="iArte inicio"><span class="brand-mark">i</span><span><strong>iarte</strong><small>GESTIÓN INTEGRAL</small></span></a>
+      <div class="side-label">ESPACIO DE TRABAJO</div>
+      <nav id="navigation">
+        <button class="nav-item active" data-view="inicio"><span>◫</span> Inicio</button>
+        <button class="nav-item" data-view="alumnos"><span>♧</span> Alumnos</button>
+        <button class="nav-item" data-view="docentes"><span>♙</span> Docentes</button>
+        <button class="nav-item" data-view="academico"><span>▤</span> Organización académica</button>
+        <button class="nav-item" data-view="asistencia"><span>✓</span> Asistencia</button>
+        <button class="nav-item" data-view="horarios"><span>◷</span> Horarios y aulas</button>
+        <button class="nav-item" data-view="produccion"><span>✧</span> Producción artística</button>
+        <button class="nav-item" data-view="finanzas"><span>＄</span> Administración</button>
+        <button class="nav-item" data-view="becas"><span>♡</span> Becas</button>
+        <button class="nav-item" data-view="informes"><span>▥</span> Informes</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="profile-avatar">IA</div><div><strong>Administración</strong><small>Panel institucional</small></div><span class="online-dot"></span></div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar"><button class="mobile-menu" id="menuButton" aria-label="Abrir menú">☰</button><div class="breadcrumbs">iArte <span>/</span> <strong id="currentSection">Inicio</strong></div><div class="top-actions"><span class="demo-tag">ENTORNO DE PRUEBA</span><button class="icon-button" title="Notificaciones">♧</button><div class="top-avatar">IA</div></div></header>
+      <section class="page-content">
+        <div id="viewRoot"></div>
+      </section>
+      <footer>iArte · Sistema administrativo integral <span>Versión inicial · Datos de demostración</span></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
