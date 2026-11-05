@@ -152,13 +152,22 @@ const teacherFields = [
   {key:"estado",label:"Estado",type:"select",options:["Activo","Licencia","Inactivo","Baja"],group:"Vínculo institucional"},
   {key:"observaciones",label:"Observaciones internas",type:"textarea",group:"Seguimiento"}
 ];
-const renderStudentDirectory = renderDirectory;
 const openStudentOrTeacherForm = openForm;
 function teacherFullName(t){return [t.nombre,t.apellido].filter(Boolean).join(" ")||t.nombre||"Sin nombre"}
 function normalizeTeachers(){data.docentes=data.docentes.map(t=>({...t,apellido:t.apellido||"",estado:t.estado||"Activo"}))}
 normalizeTeachers();
 function renderDirectory(type){
-  if(type==="alumnos")return renderStudentDirectory(type);
+  if(type==="alumnos"){
+    const rows=data.alumnos;
+    root.innerHTML=heading("GESTIÓN ACADÉMICA","Alumnos","Directorio institucional, legajos y seguimiento de trayectoria.",'<button class="primary-btn" data-action="alumno">＋ Nueva ficha</button>')+
+    '<div class="stats-grid">'+stat("Total de fichas",rows.length,"Registros del directorio","♧","lav")+stat("Activos",rows.filter(s=>(s.estado||"Activo")==="Activo").length,"Alumnos con cursada activa","✓","mint")+stat("Preinscriptos",rows.filter(s=>s.estado==="Preinscripto").length,"Pendientes de incorporación","＋","peach")+stat("En pausa",rows.filter(s=>s.estado==="En pausa").length,"Trayectorias pausadas","◷","sky")+'</div>'+
+    '<div class="notice"><strong>Legajo integral:</strong> cada alumno puede tener datos de identificación, contactos responsables, disciplina, nivel, comisión, turno, fecha de ingreso y observaciones administrativas. Esta versión usa almacenamiento local de demostración; no ingreses datos reales todavía.</div>'+
+    '<div class="toolbar"><input class="search-input" id="tableSearch" placeholder="Buscar por nombre, legajo, disciplina o comisión..."><select class="field-select" id="statusFilter"><option value="">Todos los estados</option><option>Activo</option><option>Preinscripto</option><option>En pausa</option><option>Egresado</option><option>Baja</option></select><button class="secondary-btn" id="exportStudents">Exportar CSV</button></div>'+
+    '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Legajo</th><th>Alumno/a</th><th>Disciplina</th><th>Nivel</th><th>Comisión</th><th>Estado</th><th>Ficha</th></tr></thead><tbody id="tableBody">'+studentRows(rows)+'</tbody></table></div>'+
+    '<p class="panel-sub" style="margin:12px 2px">Total de alumnos: <strong>'+rows.length+'</strong> · Seleccioná “Ver ficha” para consultar o editar el legajo.</p>';
+    const apply=()=>{const q=document.getElementById("tableSearch").value.toLowerCase(),st=document.getElementById("statusFilter").value;const filtered=data.alumnos.filter(s=>(!st||s.estado===st)&&JSON.stringify(s).toLowerCase().includes(q));document.getElementById("tableBody").innerHTML=studentRows(filtered)};
+    document.getElementById("tableSearch").addEventListener("input",apply);document.getElementById("statusFilter").addEventListener("change",apply);document.getElementById("exportStudents").onclick=exportStudentsCSV;return;
+  }
   if(type!=="docentes")return renderLegacyDirectory(type);
   const rows=data.docentes;
   root.innerHTML=heading("EQUIPO INSTITUCIONAL","Docentes","Legajos profesionales, asignaciones académicas, disponibilidad y seguimiento del equipo.",'<button class="primary-btn" data-action="docente">＋ Nuevo legajo</button>')+
