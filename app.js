@@ -39,4 +39,95 @@ function go(view){activeView=view;render()}
 function openForm(type){const isStudent=type==="alumno",fields=configs[isStudent?"alumnos":"docentes"].fields;const backdrop=document.createElement("div");backdrop.className="modal-backdrop";backdrop.innerHTML=`<form class="modal" id="recordForm"><h2>${isStudent?"Nuevo alumno":"Nuevo docente"}</h2><p>Completá los datos básicos. Podrás ampliar la ficha en próximas versiones.</p><div class="form-row">${fields.map(f=>`<div class="form-field"><label for="f-${f[0]}">${f[1]}</label><input class="field-input" id="f-${f[0]}" name="${f[0]}" required placeholder="${f[1]}"></div>`).join("")}</div><div class="modal-actions"><button type="button" class="secondary-btn" id="cancelModal">Cancelar</button><button class="primary-btn" type="submit">Guardar registro</button></div></form>`;document.body.appendChild(backdrop);document.getElementById("cancelModal").onclick=()=>backdrop.remove();backdrop.addEventListener("click",e=>{if(e.target===backdrop)backdrop.remove()});document.getElementById("recordForm").onsubmit=e=>{e.preventDefault();const form=new FormData(e.target),record=Object.fromEntries(form.entries());record.id=(isStudent?"IA-":"DOC-")+String(data[isStudent?"alumnos":"docentes"].length+1).padStart(4,"0");if(!isStudent&&!record.estado)record.estado="Activo";data[isStudent?"alumnos":"docentes"].push(record);data.actividades.unshift({icon:"＋",title:isStudent?"Nuevo alumno registrado":"Nuevo docente registrado",detail:record.nombre,time:"Ahora"});saveData();backdrop.remove();render();toast("Registro guardado en este navegador")}}
 document.addEventListener("click",e=>{const nav=e.target.closest("[data-view]");if(nav){go(nav.dataset.view);return}const link=e.target.closest("[data-go]");if(link){go(link.dataset.go);return}const action=e.target.closest("[data-action]");if(action){openForm(action.dataset.action);return}const del=e.target.closest("[data-delete]");if(del){if(confirm("¿Eliminar este registro de demostración?")){data[del.dataset.delete].splice(Number(del.dataset.index),1);saveData();render();toast("Registro eliminado")}}});
 document.getElementById("menuButton").onclick=()=>document.getElementById("sidebar").classList.toggle("open");
+
+// ===== MÓDULO DE ALUMNOS: FICHAS INTEGRALES =====
+const studentFields = [
+  {key:"nombre",label:"Nombre",type:"text",required:true,group:"Identificación"},
+  {key:"apellido",label:"Apellido",type:"text",required:true,group:"Identificación"},
+  {key:"fechaNacimiento",label:"Fecha de nacimiento",type:"date",group:"Identificación"},
+  {key:"documento",label:"Documento (solo demostración)",type:"text",group:"Identificación"},
+  {key:"email",label:"Correo electrónico",type:"email",group:"Contacto"},
+  {key:"telefono",label:"Teléfono",type:"tel",group:"Contacto"},
+  {key:"responsable",label:"Adulto responsable / contacto",type:"text",group:"Contacto"},
+  {key:"vinculo",label:"Vínculo",type:"text",group:"Contacto"},
+  {key:"telefonoResponsable",label:"Teléfono del responsable",type:"tel",group:"Contacto"},
+  {key:"disciplina",label:"Disciplina",type:"text",required:true,group:"Trayectoria académica"},
+  {key:"nivel",label:"Nivel",type:"text",group:"Trayectoria académica"},
+  {key:"comision",label:"Comisión",type:"text",group:"Trayectoria académica"},
+  {key:"turno",label:"Turno",type:"text",group:"Trayectoria académica"},
+  {key:"fechaIngreso",label:"Fecha de ingreso",type:"date",group:"Trayectoria académica"},
+  {key:"estado",label:"Estado",type:"select",options:["Activo","Preinscripto","En pausa","Egresado","Baja"],group:"Trayectoria académica"},
+  {key:"observaciones",label:"Observaciones administrativas",type:"textarea",group:"Seguimiento"}
+];
+function studentFullName(s){return [s.nombre,s.apellido].filter(Boolean).join(" ") || s.nombre || "Sin nombre"}
+function normalizeStudents(){data.alumnos=data.alumnos.map(s=>({...s,apellido:s.apellido||"",estado:s.estado||"Activo"}))}
+normalizeStudents();
+function renderDirectory(type){
+  if(type!=="alumnos"){return renderLegacyDirectory(type)}
+  const rows=data.alumnos;
+  root.innerHTML=heading("GESTIÓN ACADÉMICA","Alumnos","Directorio institucional, legajos y seguimiento de trayectoria.",'<button class="primary-btn" data-action="alumno">＋ Nueva ficha</button>')+
+  '<div class="stats-grid">'+stat("Total de fichas",rows.length,"Registros del directorio","♧","lav")+stat("Activos",rows.filter(s=>(s.estado||"Activo")==="Activo").length,"Alumnos con cursada activa","✓","mint")+stat("Preinscriptos",rows.filter(s=>s.estado==="Preinscripto").length,"Pendientes de incorporación","＋","peach")+stat("En pausa",rows.filter(s=>s.estado==="En pausa").length,"Trayectorias pausadas","◷","sky")+'</div>'+
+  '<div class="notice"><strong>Legajo integral:</strong> cada alumno puede tener datos de identificación, contactos responsables, disciplina, nivel, comisión, turno, fecha de ingreso y observaciones administrativas. Esta versión usa almacenamiento local de demostración; no ingreses datos reales todavía.</div>'+
+  '<div class="toolbar"><input class="search-input" id="tableSearch" placeholder="Buscar por nombre, legajo, disciplina o comisión..."><select class="field-select" id="statusFilter"><option value="">Todos los estados</option><option>Activo</option><option>Preinscripto</option><option>En pausa</option><option>Egresado</option><option>Baja</option></select><button class="secondary-btn" id="exportStudents">Exportar CSV</button></div>'+
+  '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Legajo</th><th>Alumno/a</th><th>Disciplina</th><th>Nivel</th><th>Comisión</th><th>Estado</th><th>Ficha</th></tr></thead><tbody id="tableBody">'+studentRows(rows)+'</tbody></table></div>'+
+  '<p class="panel-sub" style="margin:12px 2px">Total de alumnos: <strong>'+rows.length+'</strong> · Seleccioná “Ver ficha” para consultar o editar el legajo.</p>';
+  const apply=()=>{const q=document.getElementById("tableSearch").value.toLowerCase(),st=document.getElementById("statusFilter").value;const filtered=data.alumnos.filter(s=>(!st||s.estado===st)&&JSON.stringify(s).toLowerCase().includes(q));document.getElementById("tableBody").innerHTML=studentRows(filtered)};
+  document.getElementById("tableSearch").addEventListener("input",apply);
+  document.getElementById("statusFilter").addEventListener("change",apply);
+  document.getElementById("exportStudents").onclick=exportStudentsCSV;
+}
+function renderLegacyDirectory(type){
+  const c=configs[type],rows=data[type];
+  root.innerHTML=heading(c.kicker,c.title,c.desc,`<button class="primary-btn" data-action="docente">＋ ${c.add}</button>`)+`<div class="toolbar"><input class="search-input" id="tableSearch" placeholder="Buscar por nombre, área o comisión..."><button class="secondary-btn" id="clearSearch">Limpiar búsqueda</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr>${c.cols.map(x=>`<th>${x}</th>`).join("")}<th>Acción</th></tr></thead><tbody id="tableBody">${directoryRows(type,rows)}</tbody></table></div><p class="panel-sub" style="margin:12px 2px">Total de registros: <strong>${rows.length}</strong></p>`;
+  document.getElementById("tableSearch").addEventListener("input",e=>{const q=e.target.value.toLowerCase();document.getElementById("tableBody").innerHTML=directoryRows(type,rows.filter(r=>Object.values(r).join(" ").toLowerCase().includes(q)))});
+  document.getElementById("clearSearch").onclick=()=>{document.getElementById("tableSearch").value="";document.getElementById("tableBody").innerHTML=directoryRows(type,rows)};
+}
+function studentRows(rows){
+  if(!rows.length)return '<tr><td colspan="7" class="empty-note">No hay alumnos que coincidan con la búsqueda.</td></tr>';
+  return rows.map(s=>'<tr><td>'+escapeHTML(s.id)+'</td><td>'+escapeHTML(studentFullName(s))+'</td><td>'+escapeHTML(s.disciplina||"—")+'</td><td>'+escapeHTML(s.nivel||"—")+'</td><td>'+escapeHTML(s.comision||"—")+'</td><td><span class="status '+(s.estado==="Preinscripto"||s.estado==="En pausa"?"pending":"")+'">'+escapeHTML(s.estado||"Activo")+'</span></td><td><button class="text-link" data-profile="'+escapeHTML(s.id)+'">Ver ficha →</button></td></tr>').join("");
+}
+function openForm(type,studentId=null){
+  if(type!=="alumno")return openLegacyForm(type);
+  const existing=studentId?data.alumnos.find(s=>s.id===studentId):null;
+  const groups=[...new Set(studentFields.map(f=>f.group))];
+  const fieldsHTML=groups.map(group=>'<div class="form-section-title">'+group+'</div><div class="form-row">'+studentFields.filter(f=>f.group===group).map(f=>{
+    const value=existing?.[f.key]||"";
+    if(f.type==="textarea")return '<div class="form-field full-field"><label for="f-'+f.key+'">'+f.label+'</label><textarea class="field-input" id="f-'+f.key+'" name="'+f.key+'" rows="3">'+escapeHTML(value)+'</textarea></div>';
+    if(f.type==="select")return '<div class="form-field"><label for="f-'+f.key+'">'+f.label+'</label><select class="field-input" id="f-'+f.key+'" name="'+f.key+'">'+f.options.map(o=>'<option '+(value===o?'selected':'')+'>'+o+'</option>').join("")+'</select></div>';
+    return '<div class="form-field"><label for="f-'+f.key+'">'+f.label+'</label><input class="field-input" id="f-'+f.key+'" name="'+f.key+'" type="'+f.type+'" value="'+escapeHTML(value)+'" '+(f.required?'required':'')+'></div>';
+  }).join("")+'</div>').join("");
+  const backdrop=document.createElement("div");backdrop.className="modal-backdrop";
+  backdrop.innerHTML='<form class="modal student-modal" id="recordForm"><h2>'+(existing?"Editar ficha de alumno/a":"Nueva ficha de alumno/a")+'</h2><p>Completá la información disponible. Los campos no obligatorios pueden quedar vacíos.</p>'+fieldsHTML+'<div class="modal-actions"><button type="button" class="secondary-btn" id="cancelModal">Cancelar</button><button class="primary-btn" type="submit">Guardar ficha</button></div></form>';
+  document.body.appendChild(backdrop);
+  document.getElementById("cancelModal").onclick=()=>backdrop.remove();
+  backdrop.addEventListener("click",e=>{if(e.target===backdrop)backdrop.remove()});
+  document.getElementById("recordForm").onsubmit=e=>{
+    e.preventDefault();const form=new FormData(e.target),record=Object.fromEntries(form.entries());
+    if(existing){Object.assign(existing,record)}else{record.id="IA-"+String(Date.now()).slice(-7);data.alumnos.push(record)}
+    data.actividades.unshift({icon:existing?"✎":"＋",title:existing?"Ficha de alumno actualizada":"Nuevo alumno registrado",detail:studentFullName(record),time:"Ahora"});
+    saveData();backdrop.remove();render();toast(existing?"Ficha actualizada":"Ficha creada correctamente");
+  };
+}
+function openLegacyForm(type){
+  const fields=configs.docentes.fields;const backdrop=document.createElement("div");backdrop.className="modal-backdrop";
+  backdrop.innerHTML='<form class="modal" id="recordForm"><h2>Nuevo docente</h2><p>Completá los datos básicos del integrante.</p><div class="form-row">'+fields.map(f=>'<div class="form-field"><label>'+f[1]+'</label><input class="field-input" name="'+f[0]+'" required></div>').join("")+'</div><div class="modal-actions"><button type="button" class="secondary-btn" id="cancelModal">Cancelar</button><button class="primary-btn" type="submit">Guardar registro</button></div></form>';
+  document.body.appendChild(backdrop);document.getElementById("cancelModal").onclick=()=>backdrop.remove();
+  document.getElementById("recordForm").onsubmit=e=>{e.preventDefault();const record=Object.fromEntries(new FormData(e.target).entries());record.id="DOC-"+String(Date.now()).slice(-6);data.docentes.push(record);saveData();backdrop.remove();render();toast("Docente registrado")};
+}
+function showStudentProfile(id){
+  const s=data.alumnos.find(x=>x.id===id);if(!s)return;
+  const groups=[["Identificación",["nombre","apellido","fechaNacimiento","documento"]],["Contacto",["email","telefono","responsable","vinculo","telefonoResponsable"]],["Trayectoria académica",["disciplina","nivel","comision","turno","fechaIngreso","estado"]],["Seguimiento",["observaciones"]]];
+  const labels=Object.fromEntries(studentFields.map(f=>[f.key,f.label]));
+  const backdrop=document.createElement("div");backdrop.className="modal-backdrop";
+  backdrop.innerHTML='<section class="modal student-modal"><div class="profile-heading"><div><div class="eyebrow">LEGAJO '+escapeHTML(s.id)+'</div><h2>'+escapeHTML(studentFullName(s))+'</h2><p>Ficha integral del alumno/a</p></div><span class="status">'+escapeHTML(s.estado||"Activo")+'</span></div>'+groups.map(([g,keys])=>'<div class="profile-group"><h3>'+g+'</h3><div class="profile-fields">'+keys.map(k=>'<div><small>'+labels[k]+'</small><strong>'+escapeHTML(s[k]||"Sin información")+'</strong></div>').join("")+'</div></div>').join("")+'<div class="modal-actions"><button type="button" class="secondary-btn" id="closeProfile">Cerrar</button><button type="button" class="primary-btn" id="editProfile">Editar ficha</button></div></section>';
+  document.body.appendChild(backdrop);document.getElementById("closeProfile").onclick=()=>backdrop.remove();backdrop.addEventListener("click",e=>{if(e.target===backdrop)backdrop.remove()});document.getElementById("editProfile").onclick=()=>{backdrop.remove();openForm("alumno",id)};
+}
+function exportStudentsCSV(){
+  const headers=["Legajo",...studentFields.map(f=>f.label)];
+  const rows=data.alumnos.map(s=>[s.id,...studentFields.map(f=>s[f.key]||"")]);
+  const csv=[headers,...rows].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\n");
+  const blob=new Blob(["\\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="iarte-alumnos-demo.csv";a.click();URL.revokeObjectURL(url);toast("Archivo CSV preparado");
+}
+document.addEventListener("click",e=>{const profile=e.target.closest("[data-profile]");if(profile)showStudentProfile(profile.dataset.profile)});
+
 render();
