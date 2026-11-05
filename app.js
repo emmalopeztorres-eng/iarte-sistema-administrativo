@@ -153,7 +153,7 @@ const teacherFields = [
   {key:"observaciones",label:"Observaciones internas",type:"textarea",group:"Seguimiento"}
 ];
 function teacherFullName(t){return [t.nombre,t.apellido].filter(Boolean).join(" ")||t.nombre||"Sin nombre"}
-function normalizeTeachers(){data.docentes=data.docentes.map(t=>({...t,apellido:t.apellido||"",estado:t.estado||"Activo"}))}
+function normalizeTeachers(){data.docentes=data.docentes.map(t=>({...t,apellido:t.apellido||"",materias:t.materias||t.materia||"",estado:t.estado||"Activo"}))}
 normalizeTeachers();
 function renderDirectory(type){
   if(type==="alumnos"){
