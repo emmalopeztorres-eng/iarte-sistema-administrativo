@@ -371,7 +371,7 @@ function attendanceRoster(comisionId){
 function attendanceStats(){
  const all=data.asistencias.flatMap(x=>x.registros||[]);
  const total=all.length,present=all.filter(x=>x.estado==="Presente").length;
- return {sessions:data.asistencias.length,total,present,absent:all.filter(x=>x.estado==="Ausente").length,late:all.filter(x=>x.estado==="Tarde").length,rate:total?Math.round(present/total*100):0};
+ return {sessions:data.asistencias.length,total,present,absent:all.filter(x=>x.estado==="Ausente").length,late:all.filter(x=>x.estado==="Tarde").length,rate:total?Math.round((present+all.filter(x=>x.estado==="Tarde").length)/total*100):0};
 }
 function renderAttendanceModule(){
  const st=attendanceStats(),sessions=[...data.asistencias].sort((a,b)=>b.fecha.localeCompare(a.fecha));
@@ -398,16 +398,18 @@ function openAttendanceForm(id=null){
  const old=id?data.asistencias.find(x=>x.id===id):null;
  if(!old&&!data.clases.length){toast("Primero programá las clases en Horarios y aulas");return}
  const planned=old?data.clases.find(c=>c.id===old.claseId):null;
- const date=old?.fecha||new Date().toISOString().slice(0,10);
+ const date=old?.fecha||new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
  const classOptions=data.clases.map(c=>'<option value="'+escapeHTML(c.id)+'" '+((old?.claseId||"")===c.id?'selected':'')+'>'+escapeHTML(attendanceClassLabel(c))+'</option>').join("");
  const classForRoster=planned||(data.clases.find(c=>c.id===data.clases[0]?.id));
- const roster=attendanceRoster(old?.comisionId||classForRoster?.comisionId||"");
+ let roster=attendanceRoster(old?.comisionId||classForRoster?.comisionId||"");
  const existingMap=new Map((old?.registros||[]).map(r=>[r.alumnoId,r]));
  const b=document.createElement("div");b.className="modal-backdrop";
- const rosterRows=roster.map(st=>{const rec=existingMap.get(st.id)||{};return '<tr><td>'+escapeHTML(st.id)+'</td><td>'+escapeHTML(studentFullName(st))+'</td><td><select class="field-input attendance-state" data-student="'+escapeHTML(st.id)+'">'+["Presente","Ausente","Tarde"].map(v=>'<option '+((rec.estado||"Presente")===v?'selected':'')+'>'+v+'</option>').join("")+'</select></td><td><input class="field-input attendance-minutes" data-student="'+escapeHTML(st.id)+'" type="number" min="0" max="240" placeholder="Min." value="'+escapeHTML(rec.minutosTarde||"")+'" '+(rec.estado==="Tarde"?"":"disabled")+'></td><td><input class="field-input attendance-reason" data-student="'+escapeHTML(st.id)+'" placeholder="Motivo / justificación" value="'+escapeHTML(rec.justificacion||"")+'"></td><td><input class="field-input attendance-note" data-student="'+escapeHTML(st.id)+'" placeholder="Observación" value="'+escapeHTML(rec.observaciones||"")+'"></td></tr>'}).join("");
+ const makeRosterRows=()=>roster.map(st=>{const rec=existingMap.get(st.id)||{};return '<tr><td>'+escapeHTML(st.id)+'</td><td>'+escapeHTML(studentFullName(st))+'</td><td><select class="field-input attendance-state" data-student="'+escapeHTML(st.id)+'">'+["Presente","Ausente","Tarde"].map(v=>'<option '+((rec.estado||"Presente")===v?'selected':'')+'>'+v+'</option>').join("")+'</select></td><td><input class="field-input attendance-minutes" data-student="'+escapeHTML(st.id)+'" type="number" min="0" max="240" placeholder="Min." value="'+escapeHTML(rec.minutosTarde||"") +'" '+(rec.estado==="Tarde"?"":"disabled")+'></td><td><input class="field-input attendance-reason" data-student="'+escapeHTML(st.id)+'" placeholder="Motivo / justificación" value="'+escapeHTML(rec.justificacion||"")+'"></td><td><input class="field-input attendance-note" data-student="'+escapeHTML(st.id)+'" placeholder="Observación" value="'+escapeHTML(rec.observaciones||"")+'"></td></tr>'}).join("");
+ const rosterRows=makeRosterRows();
  b.innerHTML='<form class="modal attendance-modal" id="attendanceForm"><h2>'+(old?"Editar registro de asistencia":"Tomar asistencia")+'</h2><p>Elegí una clase y completá el estado de cada estudiante.</p><div class="form-row"><div class="form-field"><label>Fecha de la clase *</label><input class="field-input" type="date" name="fecha" required value="'+escapeHTML(date)+'"></div><div class="form-field"><label>Clase programada *</label><select class="field-input" name="claseId" required>'+classOptions+'</select></div></div><div class="notice attendance-roster-notice">Padrón sugerido: '+roster.length+' alumnos activos. Revisá que la comisión seleccionada corresponda al grupo que asistió.</div><div class="data-table-wrap attendance-roster-wrap"><table class="data-table"><thead><tr><th>Legajo</th><th>Alumno/a</th><th>Estado</th><th>Demora</th><th>Justificación</th><th>Observación</th></tr></thead><tbody>'+rosterRows+'</tbody></table></div><div class="modal-actions"><button type="button" class="secondary-btn" id="cancelAttendance">Cancelar</button><button class="primary-btn">Guardar asistencia</button></div></form>';
  document.body.appendChild(b);document.getElementById("cancelAttendance").onclick=()=>b.remove();b.addEventListener("click",e=>{if(e.target===b)b.remove()});
  b.querySelectorAll(".attendance-state").forEach(sel=>sel.addEventListener("change",()=>{const m=b.querySelector('.attendance-minutes[data-student="'+sel.dataset.student+'"]');m.disabled=sel.value!=="Tarde";if(m.disabled)m.value=""}));
+ const classPicker=b.querySelector('select[name="claseId"]');classPicker.addEventListener("change",()=>{const selected=data.clases.find(c=>c.id===classPicker.value);roster=attendanceRoster(selected?.comisionId||"");b.querySelector(".attendance-roster-notice").textContent="Padrón sugerido: "+roster.length+" alumnos activos. Revisá que la comisión seleccionada corresponda al grupo que asistió.";b.querySelector(".attendance-roster-wrap tbody").innerHTML=makeRosterRows();b.querySelectorAll(".attendance-state").forEach(sel=>sel.addEventListener("change",()=>{const m=b.querySelector('.attendance-minutes[data-student="'+sel.dataset.student+'"]');m.disabled=sel.value!=="Tarde";if(m.disabled)m.value=""}))});
  document.getElementById("attendanceForm").onsubmit=e=>{
   e.preventDefault();const form=Object.fromEntries(new FormData(e.target)),cl=data.clases.find(c=>c.id===form.claseId);
   if(!cl){toast("La clase seleccionada ya no está disponible");return}
@@ -423,9 +425,6 @@ document.addEventListener("click",e=>{
  const add=e.target.closest("[data-attendance-new]");if(add){openAttendanceForm();return}
  const edit=e.target.closest("[data-attendance-edit]");if(edit){openAttendanceForm(edit.dataset.attendanceEdit);return}
  const del=e.target.closest("[data-attendance-delete]");if(del&&confirm("¿Eliminar esta sesión y sus registros individuales?")){data.asistencias=data.asistencias.filter(x=>x.id!==del.dataset.attendanceDelete);saveData();render();toast("Registro eliminado")}
-});
-document.addEventListener("change",e=>{
- if(e.target.name==="claseId"&&e.target.closest("#attendanceForm")){toast("La lista de alumnos se determina al abrir el formulario. Cerralo y volvé a abrirlo para cargar el padrón de la nueva comisión.")}
 });
 function exportAttendanceCSV(){
  const rows=[["Fecha","Materia","Comisión","Docente","Legajo","Alumno/a","Estado","Minutos tarde","Justificación","Observaciones"]];
