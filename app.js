@@ -250,6 +250,7 @@ function academicValue(type,item,field){
 function renderGeneric(type){
  if(type==="produccion")return renderProductionModule();
  if(type==="finanzas")return renderFinanceModule();
+ if(type==="becas")return renderScholarshipModule();
  if(type==="asistencia")return renderAttendanceModule();
  if(type==="horarios")return renderScheduleModule();
  if(type!=="academico")return renderOriginalGeneric(type);
@@ -509,3 +510,62 @@ function openFinanceForm(id=null){
 }
 function exportFinanceCSV(){downloadCSV("iarte-movimientos-financieros.csv",[["Fecha","Tipo","Categoría","Concepto","Relacionado","Referencia","Importe ARS","Medio","Observaciones"],...data.movimientos.map(x=>[x.fecha,x.tipo,x.categoria,x.concepto,x.relacionado,x.referencia,x.importe,x.medio,x.observaciones])])}
 document.addEventListener("click",e=>{const add=e.target.closest("[data-finance-add]");if(add){openFinanceForm();return}const edit=e.target.closest("[data-finance-edit]");if(edit){openFinanceForm(edit.dataset.financeEdit);return}const del=e.target.closest("[data-finance-delete]");if(del&&confirm("¿Eliminar este movimiento financiero?")){data.movimientos=data.movimientos.filter(x=>x.id!==del.dataset.financeDelete);saveData();render();toast("Movimiento eliminado")}});
+
+
+// ===== MÓDULO DE BECAS Y ACOMPAÑAMIENTO =====
+if(!Array.isArray(data.becas))data.becas=[];
+const scholarshipStatuses=["Borrador","Recibida","Documentación pendiente","En evaluación","Aprobada","Rechazada","En espera","Renovación pendiente","Finalizada","Desistida"];
+const scholarshipTypes=["Beca completa","Beca parcial","Beca por mérito artístico","Beca por situación económica","Beca por continuidad","Beca de emergencia","Otra"];
+function scholarshipStudentName(id){const s=data.alumnos.find(x=>x.id===id);return s?studentFullName(s):"Alumno/a no vinculado"}
+function scholarshipMoney(v){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(v||0))}
+function scholarshipStats(){
+ const all=data.becas,approved=all.filter(x=>x.estado==="Aprobada");
+ return {total:all.length,approved:approved.length,pending:all.filter(x=>["Recibida","Documentación pendiente","En evaluación","En espera","Renovación pendiente"].includes(x.estado)).length,coverage:approved.reduce((n,x)=>n+Number(x.porcentaje||0),0),full:approved.filter(x=>Number(x.porcentaje)>=100).length};
+}
+function scholarshipRows(rows){
+ if(!rows.length)return '<tr><td colspan="8" class="empty-note">No hay solicitudes que coincidan. Creá una nueva postulación para comenzar.</td></tr>';
+ return rows.map(x=>'<tr><td><strong>'+escapeHTML(scholarshipStudentName(x.alumnoId))+'</strong><br><small>'+escapeHTML(x.codigo||"Sin código")+'</small></td><td>'+escapeHTML(x.tipo||"—")+'</td><td>'+escapeHTML(x.periodo||"—")+'</td><td>'+escapeHTML(x.porcentaje||0)+'%</td><td>'+escapeHTML(x.fechaSolicitud||"—")+'</td><td><span class="status '+(["Rechazada","Finalizada","Desistida"].includes(x.estado)?"pending":"")+'">'+escapeHTML(x.estado||"Recibida")+'</span></td><td>'+escapeHTML(x.vigenciaHasta||"—")+'</td><td><button class="text-link" data-scholarship-edit="'+escapeHTML(x.id)+'">Editar</button> · <button class="text-link" data-scholarship-delete="'+escapeHTML(x.id)+'">Eliminar</button></td></tr>').join("");
+}
+function renderScholarshipModule(){
+ const st=scholarshipStats(),rows=[...data.becas].sort((a,b)=>(b.fechaSolicitud||"").localeCompare(a.fechaSolicitud||""));
+ root.innerHTML=heading("ACOMPAÑAMIENTO INSTITUCIONAL","Becas","Administrá postulaciones, documentación, evaluación, asignaciones, vigencias y renovaciones.",'<button class="primary-btn" data-scholarship-add="1">＋ Nueva solicitud</button>')+
+ '<div class="stats-grid">'+stat("Solicitudes",st.total,"Postulaciones registradas","♡","lav")+stat("Becas aprobadas",st.approved,"Asignaciones vigentes o resueltas","✓","mint")+stat("En seguimiento",st.pending,"Pendientes de resolución o documentación","◷","peach")+stat("Cobertura asignada",st.coverage+"%","Suma de porcentajes aprobados","▤","sky")+'</div>'+
+ '<div class="notice"><strong>Gestión responsable:</strong> registrá solamente la información necesaria para evaluar y acompañar cada solicitud. Esta versión es un prototipo local; no incorpora expedientes protegidos, firma digital ni notificaciones automáticas. Evitá cargar información sensible real.</div>'+
+ '<div class="toolbar"><input class="search-input" id="scholarshipSearch" placeholder="Buscar por alumno, legajo, tipo o período..."><select class="field-select" id="scholarshipStatus"><option value="">Todos los estados</option>'+scholarshipStatuses.map(x=>'<option>'+x+'</option>').join("")+'</select><select class="field-select" id="scholarshipType"><option value="">Todos los tipos</option>'+scholarshipTypes.map(x=>'<option>'+x+'</option>').join("")+'</select><button class="secondary-btn" id="scholarshipExport">Exportar CSV</button></div>'+
+ '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Alumno/a</th><th>Tipo de beca</th><th>Período</th><th>Cobertura</th><th>Solicitud</th><th>Estado</th><th>Vigencia hasta</th><th>Acciones</th></tr></thead><tbody id="scholarshipRows">'+scholarshipRows(rows)+'</tbody></table></div>'+
+ '<div class="scholarship-lower"><section class="panel"><div class="panel-head"><div><h2>Distribución de estados</h2><div class="panel-sub">Solicitudes según su etapa de gestión</div></div></div>'+scholarshipStatuses.map(x=>{const n=rows.filter(y=>y.estado===x).length;return '<div class="scholarship-state"><span>'+escapeHTML(x)+'</span><strong>'+n+'</strong><div class="scholarship-bar"><i style="width:'+(rows.length?Math.round(n/rows.length*100):0)+'%"></i></div></div>'}).join("")+'</section><section class="panel"><div class="panel-head"><div><h2>Próximas renovaciones</h2><div class="panel-sub">Becas aprobadas con fecha de vencimiento registrada</div></div></div>'+scholarshipRenewalList(rows)+'</section></div>';
+ const apply=()=>{const q=document.getElementById("scholarshipSearch").value.toLowerCase(),s=document.getElementById("scholarshipStatus").value,t=document.getElementById("scholarshipType").value;document.getElementById("scholarshipRows").innerHTML=scholarshipRows(rows.filter(x=>(!s||x.estado===s)&&(!t||x.tipo===t)&&[scholarshipStudentName(x.alumnoId),x.codigo,x.tipo,x.periodo,x.estado].join(" ").toLowerCase().includes(q)))};
+ document.getElementById("scholarshipSearch").oninput=apply;document.getElementById("scholarshipStatus").onchange=apply;document.getElementById("scholarshipType").onchange=apply;document.getElementById("scholarshipExport").onclick=exportScholarshipsCSV;
+}
+function scholarshipRenewalList(rows){
+ const today=new Date();today.setHours(0,0,0,0);
+ const upcoming=rows.filter(x=>x.estado==="Aprobada"&&x.vigenciaHasta).map(x=>({...x,days:Math.ceil((new Date(x.vigenciaHasta+"T00:00:00")-today)/86400000)})).filter(x=>x.days>=0&&x.days<=60).sort((a,b)=>a.days-b.days);
+ if(!upcoming.length)return '<p class="empty-note">No hay renovaciones dentro de los próximos 60 días.</p>';
+ return upcoming.map(x=>'<div class="scholarship-renewal"><strong>'+escapeHTML(scholarshipStudentName(x.alumnoId))+'</strong><span>'+escapeHTML(x.vigenciaHasta)+' · '+x.days+' días</span><button class="text-link" data-scholarship-edit="'+escapeHTML(x.id)+'">Abrir ficha</button></div>').join("");
+}
+function openScholarshipForm(id=null){
+ const old=id?data.becas.find(x=>x.id===id):null;
+ const b=document.createElement("div");b.className="modal-backdrop";
+ const studentOptions=data.alumnos.map(x=>'<option value="'+escapeHTML(x.id)+'" '+(old?.alumnoId===x.id?"selected":"")+'>'+escapeHTML(studentFullName(x))+' · '+escapeHTML(x.id)+'</option>').join("");
+ const field=(key,label,value="",type="text",required=false,full=false)=>'<div class="form-field '+(full?"full-field":"")+'"><label>'+label+'</label><input class="field-input" name="'+key+'" type="'+type+'" value="'+escapeHTML(value??"")+'" '+(required?"required":"")+'></div>';
+ const select=(key,label,options,value)=>'<div class="form-field"><label>'+label+'</label><select class="field-input" name="'+key+'">'+options.map(o=>'<option '+(value===o?"selected":"")+'>'+o+'</option>').join("")+'</select></div>';
+ b.innerHTML='<form class="modal scholarship-modal" id="scholarshipForm"><h2>'+(old?"Editar solicitud de beca":"Nueva solicitud de beca")+'</h2><p>Completá la postulación, el proceso de evaluación y la resolución institucional.</p>'+
+ '<div class="form-section-title">Identificación y período</div><div class="form-row"><div class="form-field"><label>Alumno/a *</label><select class="field-input" name="alumnoId" required><option value="">Seleccionar alumno/a</option>'+studentOptions+'</select></div>'+field("codigo","Código de solicitud",old?.codigo||"BE-"+String(Date.now()).slice(-7))+field("fechaSolicitud","Fecha de solicitud",old?.fechaSolicitud||new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),"date",true)+field("periodo","Período académico",old?.periodo||new Date().getFullYear(), "text",true)+select("tipo","Tipo de beca",scholarshipTypes,old?.tipo||scholarshipTypes[0])+select("estado","Estado de la solicitud",scholarshipStatuses,old?.estado||"Recibida")+'</div>'+
+ '<div class="form-section-title">Cobertura y vigencia</div><div class="form-row">'+field("porcentaje","Porcentaje de cobertura (0 a 100)",old?.porcentaje??0,"number",true)+field("vigenciaDesde","Vigencia desde",old?.vigenciaDesde||"","date")+field("vigenciaHasta","Vigencia hasta",old?.vigenciaHasta||"","date")+field("renovacion","Renovación / período siguiente",old?.renovacion||"","text")+'</div>'+
+ '<div class="form-section-title">Documentación y evaluación</div><div class="scholarship-checklist">'+["Formulario de solicitud recibido","Documentación de identidad verificada","Constancia de alumno/a regular","Documentación respaldatoria recibida","Entrevista o reunión realizada","Evaluación académica completada"].map((x,i)=>'<label><input type="checkbox" name="doc_'+i+'" '+(old?.documentacion?.[i]?"checked":"")+'><span>'+x+'</span></label>').join("")+'</div>'+
+ '<div class="form-row">'+field("evaluador","Responsable de evaluación",old?.evaluador||"")+field("fechaEvaluacion","Fecha de evaluación",old?.fechaEvaluacion||"","date")+field("comite","Comité / autoridad resolutiva",old?.comite||"")+field("fechaResolucion","Fecha de resolución",old?.fechaResolucion||"","date")+field("montoReferencia","Arancel mensual de referencia (ARS)",old?.montoReferencia??"","number")+'</div>'+
+ '<div class="form-field"><label>Fundamento y criterios de evaluación</label><textarea class="field-input" name="fundamento" rows="3">'+escapeHTML(old?.fundamento||"")+'</textarea></div><div class="form-field"><label>Resolución y condiciones</label><textarea class="field-input" name="resolucion" rows="3">'+escapeHTML(old?.resolucion||"")+'</textarea></div><div class="form-field"><label>Observaciones de seguimiento</label><textarea class="field-input" name="observaciones" rows="3">'+escapeHTML(old?.observaciones||"")+'</textarea></div>'+
+ '<div class="modal-actions"><button type="button" class="secondary-btn" id="cancelScholarship">Cancelar</button><button class="primary-btn" type="submit">Guardar solicitud</button></div></form>';
+ document.body.appendChild(b);b.querySelector("#cancelScholarship").onclick=()=>b.remove();b.addEventListener("click",e=>{if(e.target===b)b.remove()});
+ b.querySelector("#scholarshipForm").onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),f=Object.fromEntries(fd.entries());const percentage=Number(f.porcentaje);if(percentage<0||percentage>100){toast("El porcentaje debe estar entre 0 y 100");return}if(f.vigenciaDesde&&f.vigenciaHasta&&f.vigenciaHasta<f.vigenciaDesde){toast("La fecha final no puede ser anterior al inicio");return}const docs=[0,1,2,3,4,5].map(i=>fd.has("doc_"+i));const rec={...f,id:old?.id||"BEC-"+String(Date.now()).slice(-8),porcentaje:percentage,montoReferencia:Number(f.montoReferencia||0),documentacion:docs};if(old)Object.assign(old,rec);else data.becas.push(rec);data.actividades.unshift({icon:"♡",title:old?"Solicitud de beca actualizada":"Nueva solicitud de beca",detail:scholarshipStudentName(rec.alumnoId),time:"Ahora"});saveData();b.remove();render();toast("Solicitud de beca guardada")};
+}
+function exportScholarshipsCSV(){
+ const headers=["Código","Alumno/a","Legajo","Tipo","Período","Estado","Porcentaje","Fecha solicitud","Vigencia desde","Vigencia hasta","Evaluador","Fecha evaluación","Comité","Fecha resolución","Monto referencia ARS","Documentación","Fundamento","Resolución","Observaciones"];
+ const rows=data.becas.map(x=>[x.codigo,scholarshipStudentName(x.alumnoId),x.alumnoId,x.tipo,x.periodo,x.estado,x.porcentaje,x.fechaSolicitud,x.vigenciaDesde,x.vigenciaHasta,x.evaluador,x.fechaEvaluacion,x.comite,x.fechaResolucion,x.montoReferencia,(x.documentacion||[]).map((v,i)=>v?["Formulario","Identidad","Alumno regular","Respaldo","Entrevista","Evaluación académica"][i]:"").filter(Boolean).join(", "),x.fundamento,x.resolucion,x.observaciones]);
+ downloadCSV("iarte-solicitudes-becas.csv",[headers,...rows]);
+}
+document.addEventListener("click",e=>{
+ const add=e.target.closest("[data-scholarship-add]");if(add){openScholarshipForm();return}
+ const edit=e.target.closest("[data-scholarship-edit]");if(edit){openScholarshipForm(edit.dataset.scholarshipEdit);return}
+ const del=e.target.closest("[data-scholarship-delete]");if(del&&confirm("¿Eliminar esta solicitud de beca?")){data.becas=data.becas.filter(x=>x.id!==del.dataset.scholarshipDelete);saveData();render();toast("Solicitud eliminada")}
+});
