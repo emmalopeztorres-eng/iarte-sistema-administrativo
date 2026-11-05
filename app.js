@@ -86,7 +86,7 @@ function studentRows(rows){
   if(!rows.length)return '<tr><td colspan="7" class="empty-note">No hay alumnos que coincidan con la búsqueda.</td></tr>';
   return rows.map(s=>'<tr><td>'+escapeHTML(s.id)+'</td><td>'+escapeHTML(studentFullName(s))+'</td><td>'+escapeHTML(s.disciplina||"—")+'</td><td>'+escapeHTML(s.nivel||"—")+'</td><td>'+escapeHTML(s.comision||"—")+'</td><td><span class="status '+(s.estado==="Preinscripto"||s.estado==="En pausa"?"pending":"")+'">'+escapeHTML(s.estado||"Activo")+'</span></td><td><button class="text-link" data-profile="'+escapeHTML(s.id)+'">Ver ficha →</button></td></tr>').join("");
 }
-function openForm(type,studentId=null){
+function openStudentForm(type,studentId=null){
   if(type!=="alumno")return openLegacyForm(type);
   const existing=studentId?data.alumnos.find(s=>s.id===studentId):null;
   const groups=[...new Set(studentFields.map(f=>f.group))];
@@ -152,7 +152,6 @@ const teacherFields = [
   {key:"estado",label:"Estado",type:"select",options:["Activo","Licencia","Inactivo","Baja"],group:"Vínculo institucional"},
   {key:"observaciones",label:"Observaciones internas",type:"textarea",group:"Seguimiento"}
 ];
-const openStudentOrTeacherForm = openForm;
 function teacherFullName(t){return [t.nombre,t.apellido].filter(Boolean).join(" ")||t.nombre||"Sin nombre"}
 function normalizeTeachers(){data.docentes=data.docentes.map(t=>({...t,apellido:t.apellido||"",estado:t.estado||"Activo"}))}
 normalizeTeachers();
@@ -187,7 +186,7 @@ function teacherRows(rows){
   return rows.map(t=>'<tr><td>'+escapeHTML(t.id)+'</td><td>'+escapeHTML(teacherFullName(t))+'</td><td>'+escapeHTML(t.area||"—")+'</td><td>'+escapeHTML(t.materias||t.materia||"—")+'</td><td>'+escapeHTML(t.comisiones||"—")+'</td><td>'+escapeHTML(t.cargaHoraria||"—")+'</td><td><span class="status '+(t.estado==="Licencia"||t.estado==="Inactivo"||t.estado==="Baja"?"pending":"")+'">'+escapeHTML(t.estado||"Activo")+'</span></td><td><button class="text-link" data-teacher-profile="'+escapeHTML(t.id)+'">Ver ficha →</button></td></tr>').join("");
 }
 function openForm(type,teacherId=null){
-  if(type==="alumno")return openStudentOrTeacherForm(type,teacherId);
+  if(type==="alumno")return openStudentForm(type,teacherId);
   if(type!=="docente")return openLegacyForm(type);
   const existing=teacherId?data.docentes.find(t=>t.id===teacherId):null;
   const groups=[...new Set(teacherFields.map(f=>f.group))];
